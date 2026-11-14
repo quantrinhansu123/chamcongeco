@@ -21,6 +21,29 @@ jobs:
           curl --fail --location --retry 2 -o /tmp/spoof.jpg https://raw.githubusercontent.com/minivision-ai/Silent-Face-Anti-Spoofing/master/images/sample/image_F1.jpg
           uv run --project backend python backend/scripts/benchmark_runtime.py --image /tmp/live.jpg --spoof /tmp/spoof.jpg --runs 3
           uv run --project backend python backend/scripts/verify_enrollment.py --image /tmp/live.jpg
+      - name: Native Render build and production startup
+        shell: bash
+        run: |
+          export FACE_MODEL_DIR="$RUNNER_TEMP/native-render-models"
+          export APP_ENV=production
+          export STORAGE_BACKEND=supabase
+          bash backend/scripts/render-build.sh
+          export STORAGE_BACKEND=sqlite
+          export FACE_DATA_DIR="$RUNNER_TEMP/native-render-data"
+          export FACE_ADMIN_API_KEY="$(openssl rand -hex 32)"
+          export FACE_KIOSK_API_KEY="$(openssl rand -hex 32)"
+          echo "::add-mask::$FACE_ADMIN_API_KEY"
+          echo "::add-mask::$FACE_KIOSK_API_KEY"
+          export PORT=18082
+          bash backend/scripts/render-start.sh > /tmp/native-render.log 2>&1 &
+          NATIVE_PID=$!
+          trap 'cat /tmp/native-render.log; kill "$NATIVE_PID" 2>/dev/null || true; wait "$NATIVE_PID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 45); do curl --fail --silent http://127.0.0.1:18082/readyz > /dev/null && break; sleep 1; done
+          curl --fail --silent http://127.0.0.1:18082/readyz
+          test "$(curl --silent --head --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18082/healthz)" = 200
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18082/api/employees)" = 401
+          curl --fail --silent -H "Authorization: Bearer $FACE_KIOSK_API_KEY" http://127.0.0.1:18082/api/session > /tmp/native-render-session.json
+          python -c "import json; assert json.load(open('/tmp/native-render-session.json'))['role']=='kiosk'; print('Native Render scripts, model preparation without runtime credentials, dynamic port, health and authentication passed')"
   frontend-and-sql:
     runs-on: ubuntu-latest
     steps:

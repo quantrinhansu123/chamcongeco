@@ -2,6 +2,8 @@
 
 Entrypoint: `backend.main:app`. Runtime mới ở `src/backend/runtime/`; prototype cũ được giữ để regression/đối chiếu, không phải cấu hình triển khai.
 
+Render Python: [cấu hình Pro](../docs/RENDER_PRO.md), build `bash scripts/render-build.sh`, start `bash scripts/render-start.sh` với Root Directory `backend`. Build tự chuẩn bị model; các biến production được kiểm tra khi start.
+
 Từ thư mục gốc:
 
 ```bash

@@ -34,9 +34,9 @@ BACKEND_FILES = {
     ".env.example",
     "Dockerfile",
 }
-SCRIPTS = {"download_models.py", "import_csv.py", "benchmark_runtime.py", "verify_enrollment.py"}
+SCRIPTS = {"download_models.py", "import_csv.py", "benchmark_runtime.py", "verify_enrollment.py", "render-build.sh", "render-start.sh"}
 SQL = {"schema.sql", "003_runtime.sql", "sequence_sync.sql"}
-DOCS = {"ARCHITECTURE.md", "MIGRATION.md", "OPERATIONS.md", "VERIFICATION.md", "AUTO_ENROLLMENT.md", "HANDOVER.md", "RENDER.md", "UPSTREAM_SYNC.md"}
+DOCS = {"ARCHITECTURE.md", "MIGRATION.md", "OPERATIONS.md", "VERIFICATION.md", "AUTO_ENROLLMENT.md", "HANDOVER.md", "RENDER.md", "UPSTREAM_SYNC.md", "RENDER_PRO.md"}
 TOOLS = {"package.json", "bun.lock", "test-supabase.mjs", "export_public.py", "face-quality-fixtures.json"}
 SECRET = re.compile(
     r"(?:sb_secret_[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{24,}|AKIA[A-Z0-9]{16}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{20,})"

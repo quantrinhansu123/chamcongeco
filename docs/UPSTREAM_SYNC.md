@@ -17,6 +17,8 @@ Vercel hiện phục vụ frontend tại `https://chamcongeco.vercel.app` và fr
 
 Backend dùng entrypoint `backend.main:app`, một Uvicorn worker. Model phải được chuẩn bị bằng `python scripts/download_models.py` (từ root `backend`) trong bước build hoặc bằng một bước chuẩn bị đã được cấu hình; model được kiểm tra checksum trước khi phục vụ. Nếu dùng Docker, Dockerfile là `backend/Dockerfile`, context là repo root, build arg `FACE_DOWNLOAD_MODELS=1`.
 
+Đã có hai script dành cho Render Python: `scripts/render-build.sh` và `scripts/render-start.sh` (Root Directory `backend`). Xem [hướng dẫn thao tác Render Pro](RENDER_PRO.md) cho các trường Settings và Environment; build chuẩn bị model độc lập với thông tin đăng nhập runtime.
+
 Đối chiếu biến môi trường trong `backend/.env.example`: `APP_ENV=production`, hai mã `FACE_ADMIN_API_KEY`/`FACE_KIOSK_API_KEY` khác nhau, `FACE_CORS_ORIGINS` có origin frontend thực tế, `STORAGE_BACKEND` và thông tin kho dữ liệu đúng. Không đưa khóa quản trị hoặc Supabase secret vào biến `VITE_*`. `/healthz` hỗ trợ GET/HEAD; health check sẵn sàng là `/readyz`.
 
 **Database có sẵn không đồng nghĩa đã tương thích với runtime mới.** Nếu dùng `STORAGE_BACKEND=supabase`, runtime cần các cột model/profile và RPC được định nghĩa trong `backend/supabase/003_runtime.sql`. Lần đồng bộ mã này không thực thi SQL đó. Redeploy riêng sẽ không tự bổ sung schema; backend có thể chưa khởi động được nếu database đang dùng schema cũ. Giữ điều kiện này rõ khi bàn giao, không ghi nhận bản Pro đã chạy đạt chỉ vì mã đã lên GitHub.
