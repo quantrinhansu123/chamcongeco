@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 
 from backend.api.dependencies import get_core
 from backend.api.errors import as_http_exception, database_http_exception
-from backend.legacy_main import CoreServices
+from backend.main import CoreServices
 from backend.models.schemas import EmployeeAttendance, EmployeeCreated
 
 router = APIRouter(prefix="/api", tags=["employees"])

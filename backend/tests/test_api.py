@@ -9,7 +9,7 @@ from unittest.mock import patch
 import numpy as np
 
 from backend.config import Settings
-from backend.legacy_main import create_app
+from backend.main import create_app
 from backend.services.face_encoder import EncodedFace
 from backend.services.face_recognizer import RecognitionResult
 

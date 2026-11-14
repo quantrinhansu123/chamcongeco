@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from backend.api.dependencies import get_core
 from backend.api.errors import as_http_exception, database_http_exception
-from backend.legacy_main import CoreServices
+from backend.main import CoreServices
 from backend.models.schemas import RecognitionResponse
 from backend.services.face_liveness import (
     LivenessCheckUnavailableError,

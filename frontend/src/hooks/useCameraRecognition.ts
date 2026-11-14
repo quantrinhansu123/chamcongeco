@@ -1,187 +1,228 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, getRequestStatus, recognizeFrame } from '../services/api'
-import type { CameraState, RecognitionState, RecognizedFace, RecognitionResponse } from '../types/face'
-import { configureCamera } from '../enrollment/camera'
+import { ApiError, recognizeFrame } from '../services/api'
+import type {
+  CameraState,
+  RecognitionState,
+  RecognizedFace,
+} from '../types/face'
 
-const INTENT_KEY = 'attendly.pending-punch'
-interface UseCameraRecognitionOptions {
-  recognitionEnabled: boolean
-  onAttendanceUpdated: (receipt: RecognitionResponse) => void
+interface FrameSize {
+  width: number
+  height: number
 }
 
-export function useCameraRecognition({ recognitionEnabled, onAttendanceUpdated }: UseCameraRecognitionOptions) {
+interface UseCameraRecognitionOptions {
+  recognitionEnabled: boolean
+  onAttendanceUpdated: () => void
+}
+
+export function useCameraRecognition({
+  recognitionEnabled,
+  onAttendanceUpdated,
+}: UseCameraRecognitionOptions) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const activeRequestRef = useRef<AbortController | null>(null)
-  const generationRef = useRef(0)
+  const requestGenerationRef = useRef(0)
   const busyRef = useRef(false)
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const [initialIntent] = useState(() => sessionStorage.getItem(INTENT_KEY))
-  const requestIdRef = useRef(initialIntent)
-  const recoveryRef = useRef(!!initialIntent)
-  const delayRef = useRef(250)
   const [cameraState, setCameraState] = useState<CameraState>('idle')
   const [recognitionState, setRecognitionState] = useState<RecognitionState>('idle')
   const [faces, setFaces] = useState<RecognizedFace[]>([])
-  const [receipt, setReceipt] = useState<RecognitionResponse | null>(null)
-  const [frameSize, setFrameSize] = useState({ width: 640, height: 480 })
+  const [frameSize, setFrameSize] = useState<FrameSize>({ width: 640, height: 480 })
   const [error, setError] = useState<string | null>(null)
 
-  const releaseStream = useCallback(() => {
-    streamRef.current?.getTracks().forEach(track => track.stop())
-    streamRef.current = null
-    if (videoRef.current) videoRef.current.srcObject = null
-  }, [])
-
   const stopCamera = useCallback(() => {
-    generationRef.current += 1
+    requestGenerationRef.current += 1
     activeRequestRef.current?.abort()
     activeRequestRef.current = null
-    releaseStream()
-    // An aborted HTTP request may still commit on the server. Retain its UUID.
-    recoveryRef.current = !!requestIdRef.current
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    if (videoRef.current) videoRef.current.srcObject = null
     setFaces([])
-    setReceipt(null)
     setError(null)
     setRecognitionState('idle')
     setCameraState('idle')
-  }, [releaseStream])
-
-  const acceptReceipt = useCallback((result: RecognitionResponse) => {
-    if (result.status !== 'confirmed' || result.attendance.length === 0) return false
-    releaseStream()
-    sessionStorage.removeItem(INTENT_KEY)
-    requestIdRef.current = null
-    recoveryRef.current = false
-    setReceipt(result)
-    setFaces(result.faces)
-    setCameraState('idle')
-    setRecognitionState('recognized')
-    setError(null)
-    onAttendanceUpdated(result)
-    return true
-  }, [onAttendanceUpdated, releaseStream])
+  }, [])
 
   const startCamera = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraState('unavailable')
+      setError('Trình duyệt này không hỗ trợ truy cập camera.')
+      return
+    }
+
     stopCamera()
-    const generation = generationRef.current
-    const controller = new AbortController()
-    activeRequestRef.current = controller
+    const generation = requestGenerationRef.current
     setCameraState('requesting')
+    setError(null)
     try {
-      if (recognitionEnabled && requestIdRef.current) {
-        const previous = await getRequestStatus(requestIdRef.current, controller.signal)
-        if (generation !== generationRef.current) return
-        if (previous.status === 'confirmed' && acceptReceipt(previous)) return
-        if (previous.status === 'abandoned') {
-          requestIdRef.current = null
-          sessionStorage.removeItem(INTENT_KEY)
-        }
-        recoveryRef.current = false
-      }
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera cần HTTPS hoặc địa chỉ localhost và trình duyệt hỗ trợ camera.')
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false,
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } },
+        audio: false,
       })
-      if (generation !== generationRef.current) { stream.getTracks().forEach(track => track.stop()); return }
+      if (generation !== requestGenerationRef.current) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
       streamRef.current = stream
-      const track = stream.getVideoTracks()[0]
-      if (track) await configureCamera(track, controller.signal)
-      if (generation !== generationRef.current) return
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         await videoRef.current.play()
-        if (generation !== generationRef.current) return
-        if (videoRef.current.videoWidth) setFrameSize({ width: videoRef.current.videoWidth, height: videoRef.current.videoHeight })
+        if (generation !== requestGenerationRef.current) return
+        if (videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
+          setFrameSize({
+            width: videoRef.current.videoWidth,
+            height: videoRef.current.videoHeight,
+          })
+        }
       }
-      delayRef.current = 250
       setCameraState('active')
-    } catch (error) {
-      if (generation !== generationRef.current) return
-      releaseStream()
-      const denied = error instanceof DOMException && ['NotAllowedError', 'SecurityError'].includes(error.name)
+    } catch (cameraError) {
+      if (generation !== requestGenerationRef.current) return
+      streamRef.current?.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+      if (videoRef.current) videoRef.current.srcObject = null
+      const denied =
+        cameraError instanceof DOMException &&
+        ['NotAllowedError', 'SecurityError'].includes(cameraError.name)
       setCameraState(denied ? 'permission-denied' : 'unavailable')
-      setError(denied ? 'Quyền camera bị từ chối. Cho phép truy cập trong cài đặt trình duyệt.' : error instanceof Error ? error.message : 'Không tìm thấy camera khả dụng.')
-    } finally { if (activeRequestRef.current === controller) activeRequestRef.current = null }
-  }, [acceptReceipt, recognitionEnabled, releaseStream, stopCamera])
+      setError(
+        denied
+          ? 'Quyền camera bị từ chối. Cho phép truy cập trong cài đặt trình duyệt.'
+          : 'Không tìm thấy camera khả dụng trên thiết bị.',
+      )
+    }
+  }, [stopCamera])
 
   const captureAndRecognize = useCallback(async () => {
     const video = videoRef.current
-    if (!recognitionEnabled || !video || !streamRef.current?.active || busyRef.current || video.readyState < 2 || !video.videoWidth) return
-    const generation = generationRef.current
-    const controller = new AbortController()
+    if (
+      !recognitionEnabled ||
+      !video ||
+      !streamRef.current?.active ||
+      busyRef.current
+    ) {
+      return
+    }
+
+    if (
+      video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
+      video.videoWidth === 0 ||
+      video.videoHeight === 0
+    ) {
+      console.debug('[recognition] Waiting for a camera frame', {
+        readyState: video.readyState,
+        videoWidth: video.videoWidth,
+        videoHeight: video.videoHeight,
+      })
+      return
+    }
+
+    const generation = requestGenerationRef.current
     busyRef.current = true
-    activeRequestRef.current = controller
     setRecognitionState('recognizing')
-    const started = performance.now()
     try {
-      if (recoveryRef.current && requestIdRef.current) {
-        const previous = await getRequestStatus(requestIdRef.current, controller.signal)
-        if (generation !== generationRef.current) return
-        if (previous.status === 'confirmed' && acceptReceipt(previous)) return
-        if (previous.status === 'abandoned') throw new ApiError('Lượt trước đã hết hạn. Bấm dừng và bắt đầu lượt mới.', 409, 'request_expired')
-        recoveryRef.current = false
-      }
       const width = Math.min(video.videoWidth, 640)
-      const height = Math.round(width * video.videoHeight / video.videoWidth)
-      const canvas = canvasRef.current ?? (canvasRef.current = document.createElement('canvas'))
+      const height = Math.round((width / video.videoWidth) * video.videoHeight)
+      const canvas = document.createElement('canvas')
       canvas.width = width
       canvas.height = height
       const context = canvas.getContext('2d')
       if (!context) throw new Error('Trình duyệt không thể xử lý ảnh camera.')
+
       context.drawImage(video, 0, 0, width, height)
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
-      if (!blob) throw new Error('Không tạo được ảnh từ camera.')
-      if (generation !== generationRef.current) return
-      requestIdRef.current ??= crypto.randomUUID()
-      sessionStorage.setItem(INTENT_KEY, requestIdRef.current)
-      recoveryRef.current = true
-      const result = await recognizeFrame(blob, requestIdRef.current, controller.signal)
-      if (generation !== generationRef.current) return
-      recoveryRef.current = false
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/jpeg', 0.82),
+      )
+      if (!blob) throw new Error('Trình duyệt không thể tạo ảnh từ camera.')
+      if (generation !== requestGenerationRef.current) return
+
+      const controller = new AbortController()
+      activeRequestRef.current = controller
+      console.info('[recognition] Sending camera frame', {
+        width,
+        height,
+        bytes: blob.size,
+      })
+      const result = await recognizeFrame(blob, controller.signal)
+      if (generation !== requestGenerationRef.current) return
+      console.info('[recognition] Result received', {
+        faces: result.faces.length,
+        matched: result.faces.filter((face) => face.employee_id !== null).length,
+        attendanceUpdated: result.attendance_updated,
+      })
+      setFaces(result.faces)
       setFrameSize({ width, height })
-      if (!acceptReceipt(result)) {
-        setFaces(result.faces)
-        setRecognitionState(result.faces.length ? 'unknown' : 'no-face')
-        setError(null)
+      if (result.faces.some((face) => face.employee_id !== null)) {
+        // One confirmed recognition per click; checkout requires a new user action.
+        streamRef.current?.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+        if (videoRef.current) videoRef.current.srcObject = null
+        setCameraState('idle')
+        await onAttendanceUpdated()
+        if (generation !== requestGenerationRef.current) return
+        setRecognitionState('recognized')
+      } else if (result.faces.length > 0) {
+        setRecognitionState('unknown')
+      } else {
+        setRecognitionState('no-face')
       }
-      delayRef.current = Math.max(200, 500 - (performance.now() - started))
-    } catch (error) {
-      if (generation !== generationRef.current || controller.signal.aborted) return
-      const api = error instanceof ApiError ? error : null
-      setFaces([])
-      setError(error instanceof Error ? error.message : 'Nhận diện không thành công.')
-      setRecognitionState(api?.code === 'spoof_detected' ? 'spoof-detected' : 'backend-error')
-      delayRef.current = api && [0, 429, 500, 502, 503, 504].includes(api.status) ? Math.min(5000, delayRef.current * 2 + 250) : 750
-      if (api?.code === 'request_expired') {
-        sessionStorage.removeItem(INTENT_KEY)
-        requestIdRef.current = null
+      setError(null)
+    } catch (requestError) {
+      if (generation !== requestGenerationRef.current) return
+      if (requestError instanceof DOMException && requestError.name === 'AbortError') return
+      console.error('[recognition] Camera frame failed', requestError)
+      const message = requestError instanceof Error ? requestError.message : 'Nhận diện không thành công.'
+      if (
+        requestError instanceof ApiError &&
+        requestError.status === 403 &&
+        /photo or screen replay/i.test(message)
+      ) {
+        setFaces([])
+        setRecognitionState('spoof-detected')
+        setError('Phát hiện ảnh hoặc màn hình. Hãy dùng khuôn mặt thật; chưa ghi nhận chấm công.')
+      } else {
+        setRecognitionState('backend-error')
+        setError(message)
       }
-      if (api && [401, 409].includes(api.status)) { releaseStream(); setCameraState('idle') }
     } finally {
-      if (activeRequestRef.current === controller) activeRequestRef.current = null
+      activeRequestRef.current = null
       busyRef.current = false
     }
-  }, [acceptReceipt, recognitionEnabled, releaseStream])
+  }, [onAttendanceUpdated, recognitionEnabled])
 
   useEffect(() => {
-    const hidden = () => { if (document.hidden) stopCamera() }
-    document.addEventListener('visibilitychange', hidden)
-    return () => { document.removeEventListener('visibilitychange', hidden); stopCamera() }
+    return stopCamera
   }, [stopCamera])
 
   useEffect(() => {
     if (cameraState !== 'active' || !recognitionEnabled) return
+
     let cancelled = false
     let timeout: number | undefined
-    const loop = async () => {
+
+    const recognizeContinuously = async () => {
       await captureAndRecognize()
-      if (!cancelled && streamRef.current?.active) timeout = window.setTimeout(loop, delayRef.current)
+      if (!cancelled) timeout = window.setTimeout(recognizeContinuously, 1000)
     }
+
+    // Frame recognition synchronizes the live camera with the backend.
     // oxlint-disable-next-line react/set-state-in-effect
-    void loop()
-    return () => { cancelled = true; if (timeout !== undefined) window.clearTimeout(timeout) }
+    void recognizeContinuously()
+    return () => {
+      cancelled = true
+      if (timeout !== undefined) window.clearTimeout(timeout)
+    }
   }, [cameraState, captureAndRecognize, recognitionEnabled])
 
-  return { videoRef, cameraState, recognitionState, faces, receipt, frameSize, error, startCamera, stopCamera }
+  return {
+    videoRef,
+    cameraState,
+    recognitionState,
+    faces,
+    frameSize,
+    error,
+    startCamera,
+    stopCamera,
+  }
 }

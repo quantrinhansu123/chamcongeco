@@ -13,14 +13,14 @@ fonts.$font-families: map.set(fonts.$font-families, 'sans', ('Inter', 'Segoe UI'
   font-display: swap;
 }
 
-.app-shell, .session-gate {
+.app-shell {
   @include type.type-style('body-01');
   --cds-spacing-05: #{spacing.$spacing-05};
   --cds-spacing-06: #{spacing.$spacing-06};
   --cds-spacing-07: #{spacing.$spacing-07};
 }
 
-.intro h1, .session-gate h1 {
+.intro h1 {
   @include type.type-style('heading-05');
 }
 
@@ -71,13 +71,6 @@ fonts.$font-families: map.set(fonts.$font-families, 'sans', ('Inter', 'Segoe UI'
 .attendance-confirmation-copy span {
   @include type.type-style('body-02');
 }
-
-.enrollment-files, .session-gate p { @include type.type-style('body-01'); }
-.reenrollment-note, .attendance-confirmation-copy small { @include type.type-style('label-01'); }
-.capture-instruction, .enrollment-help, .upload-previews { @include type.type-style('body-01'); }
-.capture-count, .capture-note, .pose-card > span { @include type.type-style('label-01'); }
-.pose-card strong { @include type.type-style('label-01'); font-weight: 600; }
-.pose-number { @include type.type-style('heading-03'); }
 
 .camera-status strong, .camera-placeholder strong,
 .employee-name, .attendance-confirmation-copy strong, .message-action, .upload-copy strong {

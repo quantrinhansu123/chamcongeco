@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { Button, InlineNotification, TextInput } from '@carbon/react'
+import { InlineNotification, TextInput } from '@carbon/react'
 import type { EmployeeAttendance } from '../types/face'
 
 interface EmployeeListProps {
   employees: EmployeeAttendance[]
   loading: boolean
   error: string | null
-  onReenroll?: (employee: EmployeeAttendance) => void
 }
 
 function formatArrival(value: string | null): string {
@@ -19,7 +18,7 @@ function formatArrival(value: string | null): string {
   }).format(new Date(value))
 }
 
-export function EmployeeList({ employees, loading, error, onReenroll }: EmployeeListProps) {
+export function EmployeeList({ employees, loading, error }: EmployeeListProps) {
   const [query, setQuery] = useState('')
   const search = query.trim().toLocaleLowerCase('vi-VN')
   const filteredEmployees = employees.filter((employee) =>
@@ -70,8 +69,6 @@ export function EmployeeList({ employees, loading, error, onReenroll }: Employee
               <span>
                 <span className="employee-name">{employee.name}</span>
                 <span className="employee-id">{employee.employee_id}</span>
-                {employee.requires_reenrollment ? <span className="reenrollment-note">Cần cập nhật khuôn mặt</span> : null}
-                {onReenroll ? <Button kind="ghost" size="sm" onClick={() => onReenroll(employee)} aria-label={`Cập nhật khuôn mặt ${employee.name}`}>Cập nhật ảnh</Button> : null}
               </span>
               <span className={`arrival-time${employee.is_arrive ? ' arrived' : ''}`}>
                 <span><small>Vào ca</small><time dateTime={employee.arrived_at ?? undefined}>{formatArrival(employee.arrived_at)}</time></span>
