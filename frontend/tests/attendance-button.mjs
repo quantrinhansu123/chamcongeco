@@ -21,7 +21,8 @@ test('attendance button starts recognition, shows readable names and times, and 
     await page.route('**/api/recognize', route => {
       requests++
       if (failure) return route.fulfill({ status: failure.status, json: { detail: failure.message } })
-      if (/name="action"\r\n\r\nout/.test(route.request().postDataBuffer().toString())) departed = true
+      assert.match(route.request().postDataBuffer().toString(), /name="action"\r\n\r\nauto/)
+      if (arrived) departed = true
       const alreadyArrived = arrived
       arrived = true
       return route.fulfill({ json: {
@@ -41,7 +42,7 @@ test('attendance button starts recognition, shows readable names and times, and 
     await page.locator('.attendance-button').click()
     await page.locator('.attendance-confirmation-badge').getByText('Đã lưu', { exact: true }).waitFor()
     assert.equal(requests, 1)
-    await page.getByRole('button', { name: 'Chấm công ra', exact: true }).waitFor()
+    await page.locator('#main-content').getByRole('button', { name: 'Chấm công', exact: true }).waitFor()
     assert.equal(await page.locator('video').evaluate(video => video.srcObject), null)
     await page.waitForTimeout(1200)
     assert.equal(requests, 1, 'must not record checkout automatically')
@@ -58,27 +59,27 @@ test('attendance button starts recognition, shows readable names and times, and 
       assert.equal(await name.evaluate(element => element.scrollWidth <= element.clientWidth), true)
       await page.screenshot({ path: `node_modules/.cache/attendance-result-${width}.png`, fullPage: true, animations: 'disabled' })
     }
-    // A reload identifies the employee again without overwriting the stored arrival.
+    // Reopening records checkout with one click and preserves the arrival.
     await page.reload()
-    await page.getByRole('button', { name: 'Chấm công vào', exact: true }).click()
-    await page.getByRole('button', { name: 'Chấm công ra', exact: true }).waitFor()
-    assert.equal(await page.locator('.arrival-time time').first().innerText(), '08:30:00')
-    await page.getByRole('button', { name: 'Chấm công ra', exact: true }).focus()
+    await page.locator('.employee-name').waitFor()
+    await page.locator('#main-content').getByRole('button', { name: 'Chấm công', exact: true }).focus()
     await page.keyboard.press('Enter')
     await page.getByText('Đã ghi giờ ra: 17:30:00', { exact: true }).waitFor()
     assert.equal(departed, true)
-    assert.equal(await page.getByRole('button', { name: 'Đã chấm công hôm nay', exact: true }).isDisabled(), true)
+    assert.equal(requests, 2, 'reopening needs only one click to check out')
+    assert.equal(await page.locator('.arrival-time time').first().innerText(), '08:30:00')
+    assert.equal(await page.locator('#main-content').getByRole('button', { name: 'Chấm công', exact: true }).isDisabled(), true)
     assert.equal(await page.locator('video').evaluate(video => video.srcObject), null)
     await page.getByRole('button', { name: 'Chấm công người khác', exact: true }).click()
     failure = { status: 403, message: 'Photo or screen replay detected' }
-    await page.getByRole('button', { name: 'Chấm công vào', exact: true }).click()
+    await page.locator('#main-content').getByRole('button', { name: 'Chấm công', exact: true }).click()
     await page.getByRole('alert').getByText('Phát hiện ảnh hoặc màn hình', { exact: true }).waitFor()
     assert.equal(await page.locator('.attendance-confirmation').count(), 0)
     failure = { status: 503, message: 'Máy chủ đang bận. Vui lòng thử lại.' }
     await page.getByRole('status').getByText(failure.message, { exact: true }).waitFor()
     assert.equal(await page.locator('.attendance-confirmation').count(), 0)
     await page.getByRole('button', { name: 'Dừng chấm công', exact: true }).click()
-    await page.getByRole('button', { name: 'Chấm công vào', exact: true }).last().waitFor()
+    await page.locator('#main-content').getByRole('button', { name: 'Chấm công', exact: true }).last().waitFor()
     assert.equal(await page.locator('video').evaluate(video => video.srcObject), null)
   } finally {
     await browser.close()

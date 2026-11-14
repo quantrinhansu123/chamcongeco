@@ -39,6 +39,12 @@ class AttendanceService:
             if item.is_arrive
         }
 
+    def mark_next(self, employee_id: str, distance: float, image: bytes | None = None) -> bool:
+        with self._lock:
+            attendance = self.by_employee_for_date(self._clock().date()).get(employee_id)
+            record = self.mark_departed if attendance else self.mark_arrived
+            return record(employee_id, distance, image)
+
     def mark_arrived(self, employee_id: str, distance: float, image: bytes | None = None) -> bool:
         with self._lock:
             now = self._clock()

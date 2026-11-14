@@ -31,7 +31,6 @@ export function EnrollmentTab({ onEnrolled }: EnrollmentTabProps) {
   const [message, setMessage] = useState<SubmissionMessage>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const { cameraState, videoRef, error: cameraError, startCamera, stopCamera } = useCameraRecognition({
-    action: 'in',
     recognitionEnabled: false,
     onAttendanceUpdated: ignoreAttendance,
   })

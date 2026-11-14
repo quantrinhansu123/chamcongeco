@@ -31,7 +31,7 @@ class RecognitionService:
         self._face_liveness_detector = face_liveness_detector
 
     def recognize_and_mark_arrival(self, image: bytes, action: str = "in") -> RecognitionResponse:
-        if action not in {"in", "out"}:
+        if action not in {"in", "out", "auto"}:
             raise AttendanceValidationError("Invalid attendance action")
         self._face_liveness_detector.check(image)
         employees = self._employees.list_all()
@@ -80,6 +80,8 @@ class RecognitionService:
                 continue
             processed_employee_ids.add(result.employee_id)
             record = self._attendance.mark_departed if action == "out" else self._attendance.mark_arrived
+            if action == "auto":
+                record = self._attendance.mark_next
             created = record(
                 result.employee_id, result.distance, image
             )

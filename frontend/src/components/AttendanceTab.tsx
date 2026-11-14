@@ -15,7 +15,6 @@ function formatAttendanceTime(value: string): string {
 }
 
 export function AttendanceTab() {
-  const [action, setAction] = useState<'in' | 'out'>('in')
   const [employees, setEmployees] = useState<EmployeeAttendance[]>([])
   const [loading, setLoading] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
@@ -46,7 +45,6 @@ export function AttendanceTab() {
   }, [refreshEmployees])
 
   const camera = useCameraRecognition({
-    action,
     recognitionEnabled: employees.length > 0 && !listError,
     onAttendanceUpdated: refreshEmployees,
   })
@@ -63,16 +61,12 @@ export function AttendanceTab() {
     employees.find((employee) => employee.employee_id === id),
   )
   const hasResult = camera.recognitionState === 'recognized' && matchedEmployees.length > 0
-  const hasArrival = hasResult && matchedEmployees.every((employee) => employee?.arrived_at)
   const isComplete = hasResult && matchedEmployees.every((employee) => employee?.departed_at)
-  const nextAction = hasArrival ? 'out' : action
   const awaitingConfirmation = hasResult && matchedEmployees.some((employee) =>
-    action === 'out' ? !employee?.departed_at : !employee?.arrived_at,
+    !employee?.arrived_at,
   )
 
   const startAttendance = () => {
-    camera.changeAction(nextAction)
-    setAction(nextAction)
     void camera.startCamera()
   }
 
@@ -81,7 +75,7 @@ export function AttendanceTab() {
       <div className="panel-header">
         <div>
           <h2 id="attendance-title">Chấm công khuôn mặt</h2>
-          <p>Chấm công vào khi bắt đầu ca. Sau khi ghi nhận, dùng cùng nút để chấm công ra.</p>
+          <p>Tự động ghi giờ vào hoặc giờ ra theo lượt chấm công đã lưu hôm nay.</p>
         </div>
         <span className="step-pill">Giờ Việt Nam · UTC+7</span>
       </div>
@@ -96,17 +90,17 @@ export function AttendanceTab() {
             frameSize={camera.frameSize}
             error={camera.error}
             hasEmployees={employees.length > 0}
-            actionLabel={isComplete ? 'Đã chấm công hôm nay' : nextAction === 'out' ? 'Chấm công ra' : 'Chấm công vào'}
+            actionLabel="Chấm công"
             actionDisabled={loading || !!listError || employees.length === 0 || awaitingConfirmation || isComplete}
             hasResult={hasResult}
             onStart={startAttendance}
-            onStop={() => { camera.stopCamera(); camera.changeAction('in'); setAction('in') }}
+            onStop={camera.stopCamera}
           />
           {showAttendanceResults ? (
             <div className="attendance-confirmations" aria-live="polite">
               {[...recognizedEmployees].map(([employeeId, name]) => {
                 const employee = employees.find((item) => item.employee_id === employeeId)
-                const arrivedAt = action === 'out' ? employee?.departed_at : employee?.arrived_at
+                const arrivedAt = employee?.departed_at ?? employee?.arrived_at
 
                 return (
                   <div className={`attendance-confirmation${arrivedAt ? '' : ' pending'}`} key={employeeId}>
@@ -119,7 +113,7 @@ export function AttendanceTab() {
                       <strong>{name}</strong>
                       <span>
                         {arrivedAt
-                          ? `${action === 'out' ? 'Đã ghi giờ ra' : 'Đã ghi giờ vào'}: ${formatAttendanceTime(arrivedAt)}`
+                          ? `${employee?.departed_at ? 'Đã ghi giờ ra' : 'Đã ghi giờ vào'}: ${formatAttendanceTime(arrivedAt)}`
                           : 'Đang cập nhật giờ chấm công…'}
                       </span>
                     </div>

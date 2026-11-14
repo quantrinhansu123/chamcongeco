@@ -76,6 +76,7 @@ class ApiTests(unittest.TestCase):
             recognition = self._request(
                 "POST",
                 "/api/recognize",
+                fields={"action": "auto"},
                 image=("alice.jpg", b"fake-jpeg", "image/jpeg"),
             )
 
@@ -92,11 +93,17 @@ class ApiTests(unittest.TestCase):
         self.assertIsNotNone(attendance.json()[0]["arrived_at"])
 
         with patch.object(self.app.state.core.face_recognizer, "recognize", return_value=[recognized]), patch.object(self.app.state.core.face_liveness_detector, "check"):
-            checkout = self._request("POST", "/api/recognize", fields={"action": "out"}, image=("alice.jpg", b"fake-jpeg", "image/jpeg"))
+            checkout = self._request("POST", "/api/recognize", fields={"action": "auto"}, image=("alice.jpg", b"fake-jpeg", "image/jpeg"))
         self.assertEqual(checkout.status_code, 200)
         self.assertEqual(checkout.json()["attendance_updated"], ["emp_001"])
         saved = self._request("GET", "/api/attendance").json()[0]
         self.assertGreaterEqual(saved["departed_at"], saved["arrived_at"])
+        self.assertEqual(saved["arrived_at"], attendance.json()[0]["arrived_at"])
+        with patch.object(self.app.state.core.face_recognizer, "recognize", return_value=[recognized]), patch.object(self.app.state.core.face_liveness_detector, "check"):
+            repeat = self._request("POST", "/api/recognize", fields={"action": "auto"}, image=("alice.jpg", b"fake-jpeg", "image/jpeg"))
+        self.assertEqual(repeat.status_code, 200)
+        self.assertEqual(repeat.json()["attendance_updated"], [])
+        self.assertEqual(self._request("GET", "/api/attendance").json()[0], saved)
 
     def test_spoof_does_not_record_attendance(self):
         from backend.services.face_liveness import SpoofDetectedError

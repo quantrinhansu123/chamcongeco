@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def recognize_faces(
     image: Annotated[UploadFile, File()],
     core: Annotated[CoreServices, Depends(get_core)],
-    action: Annotated[Literal["in", "out"], Form()] = "in",
+    action: Annotated[Literal["in", "out", "auto"], Form()] = "in",
 ) -> RecognitionResponse:
     logger.info(
         "Recognition requested | filename=%r | content_type=%r",
@@ -33,7 +33,7 @@ def recognize_faces(
         image_bytes = core.upload_service.read_image(
             image.file, image.filename, image.content_type
         )
-        if action == "out":
+        if action != "in":
             response = core.recognition_service.recognize_and_mark_arrival(image_bytes, action)
         else:
             response = core.recognition_service.recognize_and_mark_arrival(image_bytes)
