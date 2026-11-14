@@ -1,0 +1,212 @@
+{
+  "scope": "18 public synthetic frames, actual application MediaPipe worker CPU and ONNX preflight in temporary SQLite; no physical camera or FAR/FRR/PAD accuracy claim",
+  "quality_version": "face-quality-v2",
+  "cases": 18,
+  "client_accepted_server_rejected_before": 6,
+  "client_accepted_server_rejected_after": 0,
+  "client_rejected_server_accepted_after": 1,
+  "preflight_writes": 0,
+  "sources": [
+    {
+      "path": "fixtures/portrait-a.jpg",
+      "url": "https://raw.githubusercontent.com/opencv/opencv/4.13.0/samples/data/lena.jpg",
+      "sha256": "7de7ed51a1594fff247f4cae2301eceacf5313d6011e37b4a4c8733f7bb72c07",
+      "bytes": 91814
+    },
+    {
+      "path": "fixtures/portrait-b.jpg",
+      "url": "https://raw.githubusercontent.com/ageitgey/face_recognition/master/examples/obama.jpg",
+      "sha256": "0930e3aa8cae5920329c0c8cbc6a2ab70f47b0e67b432875beaa95cbf7e741f6",
+      "bytes": 279922
+    },
+    {
+      "path": "fixtures/portrait-c.jpg",
+      "url": "https://raw.githubusercontent.com/ageitgey/face_recognition/master/examples/biden.jpg",
+      "sha256": "3c17508bb91554c637a2eabddfae790e5bb1caba93130814fc2ac50be9760c4c",
+      "bytes": 353723
+    }
+  ],
+  "results": [
+    {
+      "fixture": "portrait-a",
+      "sigma": 0,
+      "scale": 1,
+      "sha256": "12edfbba457588354804fe88d03cfd2bc6551e779ce44e90e8be17880bdbe858",
+      "worker_sharpness": 330.5979,
+      "worker_issue": null,
+      "server_sharpness": 491.1066,
+      "server_error": null
+    },
+    {
+      "fixture": "portrait-a",
+      "sigma": 0,
+      "scale": 2,
+      "sha256": "0d13dfb70de9975fc24bc6929ea1c1f6981c379841cc9c530651aca7e24bbf4c",
+      "worker_sharpness": 238.1229,
+      "worker_issue": null,
+      "server_sharpness": 441.6669,
+      "server_error": null
+    },
+    {
+      "fixture": "portrait-a",
+      "sigma": 1.5,
+      "scale": 1,
+      "sha256": "291b2ab96e440c2f6beb387c0a564408e428ea6632c3dde106c1af08ead222a7",
+      "worker_sharpness": 50.9308,
+      "worker_issue": null,
+      "server_sharpness": 69.7841,
+      "server_error": null
+    },
+    {
+      "fixture": "portrait-a",
+      "sigma": 1.5,
+      "scale": 2,
+      "sha256": "b4e1939ddff00a598cd3d8d6c1cec200848c19477985b4f94a5ab443bd544e4c",
+      "worker_sharpness": 42.9709,
+      "worker_issue": null,
+      "server_sharpness": 66.4708,
+      "server_error": null
+    },
+    {
+      "fixture": "portrait-a",
+      "sigma": 3,
+      "scale": 1,
+      "sha256": "4c6536aed540b67f61d166bab5e5297b2993c0452f4dfa4162cc673f454a2a47",
+      "worker_sharpness": 10.5682,
+      "worker_issue": "blurry",
+      "server_sharpness": 11.815,
+      "server_error": "face_blurry"
+    },
+    {
+      "fixture": "portrait-a",
+      "sigma": 3,
+      "scale": 2,
+      "sha256": "d5f5458c41d3f48f2213cf2acb7a238572bbc51afff464ba02f7687fb06dd6c0",
+      "worker_sharpness": 9.1916,
+      "worker_issue": "blurry",
+      "server_sharpness": 11.8009,
+      "server_error": "face_blurry"
+    },
+    {
+      "fixture": "portrait-b",
+      "sigma": 0,
+      "scale": 1,
+      "sha256": "c90e76ce0e0116b98ae9ab4adeffcaced695d4bde9fdc70b31af0001e30c7c17",
+      "worker_sharpness": 621.9537,
+      "worker_issue": null,
+      "server_sharpness": 813.2919,
+      "server_error": null
+    },
+    {
+      "fixture": "portrait-b",
+      "sigma": 0,
+      "scale": 2,
+      "sha256": "5ccbdf0cb7a7ce8d0b96ce7d85fa15f616c42c3a5ba7a1a1af394e96c38a2f35",
+      "worker_sharpness": 331.9101,
+      "worker_issue": null,
+      "server_sharpness": 649.011,
+      "server_error": null
+    },
+    {
+      "fixture": "portrait-b",
+      "sigma": 1.5,
+      "scale": 1,
+      "sha256": "a5d85aa3c358e6f40da0f201417644decd9f8b63157db25fe30d9d2befea7056",
+      "worker_sharpness": 54.7757,
+      "worker_issue": null,
+      "server_sharpness": 77.0863,
+      "server_error": null
+    },
+    {
+      "fixture": "portrait-b",
+      "sigma": 1.5,
+      "scale": 2,
+      "sha256": "62b3cc8c8f828c85125e114d93e01330cadb6cea475bafee469ea44f72f1ccfe",
+      "worker_sharpness": 47.3412,
+      "worker_issue": null,
+      "server_sharpness": 73.9022,
+      "server_error": null
+    },
+    {
+      "fixture": "portrait-b",
+      "sigma": 3,
+      "scale": 1,
+      "sha256": "49ba9c0542b9c86de1e9536414530544d85650d50125eeafe15f0cae7831253d",
+      "worker_sharpness": 12.3606,
+      "worker_issue": "blurry",
+      "server_sharpness": 16.6539,
+      "server_error": "face_blurry"
+    },
+    {
+      "fixture": "portrait-b",
+      "sigma": 3,
+      "scale": 2,
+      "sha256": "8a7e718e8290cc42ee6d7ea4fc397d0fc8ebd6ba8c18dd4d340cad2f19424a78",
+      "worker_sharpness": 10.9664,
+      "worker_issue": "blurry",
+      "server_sharpness": 16.4585,
+      "server_error": "face_blurry"
+    },
+    {
+      "fixture": "portrait-c",
+      "sigma": 0,
+      "scale": 1,
+      "sha256": "e2f182d29399405f79c77bad6ea4c07d183c3efd04bdbf624d82dc92c52a41d6",
+      "worker_sharpness": 288.739,
+      "worker_issue": null,
+      "server_sharpness": 344.1994,
+      "server_error": null
+    },
+    {
+      "fixture": "portrait-c",
+      "sigma": 0,
+      "scale": 2,
+      "sha256": "3b827f9495a34c8d804208312c0fa57af9385b2b17d072d0c4074d078af1fa8a",
+      "worker_sharpness": 162.3338,
+      "worker_issue": null,
+      "server_sharpness": 290.3261,
+      "server_error": null
+    },
+    {
+      "fixture": "portrait-c",
+      "sigma": 1.5,
+      "scale": 1,
+      "sha256": "a1ad28b0ad25972465bcb1b1ebf8a41d9ab44691e802230e6576e375c182ccbd",
+      "worker_sharpness": 32.7327,
+      "worker_issue": "blurry",
+      "server_sharpness": 41.0104,
+      "server_error": null
+    },
+    {
+      "fixture": "portrait-c",
+      "sigma": 1.5,
+      "scale": 2,
+      "sha256": "f930b7c786df6ad994ba850fdc2e383afcb6ed92f62c4f4920105c6bd7fe1276",
+      "worker_sharpness": 28.4233,
+      "worker_issue": "blurry",
+      "server_sharpness": 39.4498,
+      "server_error": "face_blurry"
+    },
+    {
+      "fixture": "portrait-c",
+      "sigma": 3,
+      "scale": 1,
+      "sha256": "c41644c420ba48a24b0da43004887382eb541085502670acaf4971108f89ab36",
+      "worker_sharpness": 7.2583,
+      "worker_issue": "blurry",
+      "server_sharpness": 8.6931,
+      "server_error": "face_blurry"
+    },
+    {
+      "fixture": "portrait-c",
+      "sigma": 3,
+      "scale": 2,
+      "sha256": "e1e9cd462a4b2cbabdcceb5c8926ccf27f394ea1dbda6686da3abe3174ea0a94",
+      "worker_sharpness": 6.466,
+      "worker_issue": "blurry",
+      "server_sharpness": 8.6146,
+      "server_error": "face_blurry"
+    }
+  ],
+  "limitations": "Different mesh/SCRFD boxes, resize and JPEG can differ near threshold. Not a population error rate."
+}

@@ -4,14 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "node scripts/prepare-vision.mjs && vite",
+    "build": "node scripts/prepare-vision.mjs && tsc -b && vite build",
+    "prepare:vision": "node scripts/prepare-vision.mjs",
+    "test:unit": "bun test tests/enrollment.test.ts",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
     "@carbon/react": "^1.120.0",
     "@carbon/styles": "^1.119.0",
+    "@mediapipe/tasks-vision": "1.2.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-is": "^19.3.1"

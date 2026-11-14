@@ -1,24 +1,37 @@
 [project]
 name = "backend"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Local-first face attendance with InsightFace and durable punch receipts"
 readme = "README.md"
 authors = [
     { name = "quanhoang55", email = "quanhoang1026@gmail.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
-    # Prebuilt wheel avoids compiling dlib from source on Render.
-    "dlib-bin>=20.0.1.post1",
-    "deepface[pytorch]>=0.0.102,<0.1",
-    "face-recognition>=1.3.0",
-    "fastapi>=0.141.1",
-    "opencv-python>=5.0.0.93",
-    "python-multipart>=0.0.32",
-    # face_recognition_models 0.3.0 still imports pkg_resources at runtime.
-    "setuptools>=70,<82",
-    "uvicorn>=0.54.0",
+    "fastapi>=0.141.1,<0.142",
+    "httpx>=0.28.1,<0.29",
+    "numpy>=2.2,<3",
+    "onnxruntime==1.32.0",
+    "opencv-python-headless==5.0.0.93",
+    "pillow>=12.2,<13",
+    "python-dotenv>=1.0,<2",
+    "python-multipart>=0.0.32,<0.1",
+    "tzdata>=2026.2",
+    "uvicorn>=0.54,<0.55",
 ]
+
+[project.optional-dependencies]
+legacy = ["dlib-bin==20.0.1.post1", "face-recognition==1.3.0", "setuptools>=70,<82"]
+
+[dependency-groups]
+dev = ["ruff>=0.17.5,<0.18", "pytest>=9,<10"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B"]
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]

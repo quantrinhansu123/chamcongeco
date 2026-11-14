@@ -1,0 +1,41 @@
+{
+  "scope": "real CPU ONNX via ASGI TestClient, temporary SQLite; public static fixtures only",
+  "policy": {
+    "version": "face-quality-v2",
+    "crop_size": 128,
+    "min_sharpness": 40.0,
+    "min_brightness": 45.0,
+    "max_brightness": 220.0,
+    "min_face_pixels": 80
+  },
+  "scale_regression": [
+    {
+      "scale": 1,
+      "status": 200,
+      "quality": {
+        "brightness": 123.73653295671102,
+        "sharpness": 501.5354894259054,
+        "face_pixels": 180,
+        "policy_version": "face-quality-v2"
+      }
+    },
+    {
+      "scale": 2,
+      "status": 200,
+      "quality": {
+        "brightness": 123.52140736522233,
+        "sharpness": 405.62156748999337,
+        "face_pixels": 360,
+        "policy_version": "face-quality-v2"
+      }
+    }
+  ],
+  "preflight_samples": 7,
+  "preflight_p50_ms": 72.64,
+  "preflight_max_ms": 302.34,
+  "preflight_writes": 0,
+  "final_profiles": 1,
+  "blurred_rejected": true,
+  "wrong_person_rejected": true,
+  "limitations": "not FAR/FRR, real five-pose camera, replay validation, GPU or WAN measurement"
+}

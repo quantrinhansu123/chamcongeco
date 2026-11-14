@@ -1,0 +1,56 @@
+[
+  {
+    "fixture": "image_F1.jpg",
+    "live_score": 0.0,
+    "crop_errors": [
+      0,
+      0
+    ],
+    "decision": "spoof_detected"
+  },
+  {
+    "fixture": "image_F2.jpg",
+    "live_score": 0.0,
+    "crop_errors": [
+      0,
+      0
+    ],
+    "decision": "spoof_detected"
+  },
+  {
+    "fixture": "image_T1.jpg",
+    "live_score": 0.9998188316822052,
+    "crop_errors": [
+      0,
+      0
+    ],
+    "decision": "accepted"
+  },
+  {
+    "fixture": "portrait-a.jpg",
+    "live_score": 0.9954058825969696,
+    "crop_errors": [
+      0,
+      0
+    ],
+    "decision": "accepted"
+  },
+  {
+    "fixture": "portrait-b.jpg",
+    "live_score": 0.9997848570346832,
+    "crop_errors": [
+      0,
+      0
+    ],
+    "decision": "accepted"
+  },
+  {
+    "fixture": "portrait-c.jpg",
+    "live_score": 0.9985404014587402,
+    "crop_errors": [
+      0,
+      0
+    ],
+    "decision": "accepted"
+  }
+]

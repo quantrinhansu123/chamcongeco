@@ -1,329 +1,118 @@
-# Face Recognition Attendance System
+# Attendly · Chấm công khuôn mặt
 
-A local employee attendance application built with FastAPI, `face_recognition`,
-OpenCV, React, and TypeScript. Employees are enrolled from a face photograph,
-then the browser camera sends frames to the backend for recognition. Employee
-encodings and daily attendance are stored in CSV files; no external database is
-required.
+[![Verify](https://github.com/quantrinhansu123/chamcongeco/actions/workflows/ci.yml/badge.svg)](https://github.com/quantrinhansu123/chamcongeco/actions/workflows/ci.yml)
 
-## Features
+FastAPI + React/IBM Carbon, tối ưu cho CPU phổ thông và quy mô khoảng 200 nhân viên. Lõi mặc định: **SCRFD-500MF + MobileFaceNet (buffalo_sc) + hai MiniFASNet ONNX**. Model chạy tại máy chủ của bạn; không gọi dịch vụ AI tính tiền theo lượt nhận diện.
 
-- Enroll an employee from a JPG or PNG image containing exactly one face.
-- Store the employee's 128-value face encoding in CSV format.
-- Recognize employees from a live browser camera.
-- Mark each employee as arrived once per day.
-- Display live recognition results and today's employee attendance list.
+Đồng bộ bản phát triển [huybitvvt/chamcongeco-next](https://github.com/huybitvvt/chamcongeco-next) tại commit `8e4fe8f` về repo gốc, giữ nguyên lịch sử Git gốc. Lần đồng bộ này cập nhật mã nguồn, không chạy thay đổi database hoặc chuyển hồ sơ khuôn mặt. Xem [ghi chú bàn giao lên repo gốc](docs/UPSTREAM_SYNC.md).
 
-## Project structure
+## Thay đổi chính
 
-```text
-face_regconition/
-├── backend/
-│   ├── data/
-│   │   ├── employees.csv
-│   │   └── attendance.csv
-│   ├── src/backend/
-│   ├── tests/
-│   ├── pyproject.toml
-│   └── uv.lock
-├── frontend/
-│   ├── src/
-│   ├── package.json
-│   └── bun.lock
-└── docs/
-```
+- Giải mã ảnh/phát hiện mặt một lần; chạy hoàn toàn bằng ONNX Runtime CPU, không cần PyTorch/DeepFace ở luồng mặc định. Kiểm tra checksum và nạp model trước khi API sẵn sàng.
+- Gallery bất biến trong RAM, 1–5 vector/người, có mã phiên bản model. Hồ sơ dlib cũ được giữ riêng; cần cập nhật ảnh để dùng engine mới.
+- Đăng ký tự thu **5 góc qua camera** bằng MediaPipe chạy trong Web Worker: chọn khung ổn định, server kiểm tra ngay từng góc và tự thu lại ảnh chưa đạt. Browser/server dùng chung quality policy, có autofocus/exposure khi camera hỗ trợ. Xem lại trước khi lưu; có đường tải 1–5 ảnh khi camera không khả dụng.
+- SQLite WAL mặc định, hoặc Supabase qua kết nối HTTP dùng lại và RPC nguyên tử. CSV cũ chỉ là nguồn nhập, không còn là kho ghi đồng thời.
+- Mỗi lượt có UUID và biên nhận lưu bền vững. Retry trả lại thời gian đã lưu; bấm lặp trong 30 giây không biến giờ vào thành giờ ra. Ảnh riêng tư được lưu trước khi xác nhận công.
+- Camera chỉ có một yêu cầu đang xử lý, tự điều chỉnh nhịp gửi, có timeout/backoff và khôi phục biên nhận sau mất mạng/tải lại trang. Dừng camera khi chuyển màn hình hoặc đưa tab xuống nền.
+- Phân quyền quản trị/trạm, kiểm tra đồng ý phía máy chủ, giới hạn ảnh và tránh trả vector sinh trắc học ra API danh sách.
 
-## Prerequisites
+**Đây là bản đã kiểm tra phần mềm và đo cục bộ, chưa được nghiệm thu trên camera/nhân viên thật.** MiniFASNet là bộ lọc chống giả mạo thụ động, không bảo đảm chặn mọi ảnh/video. Một số ảnh chân dung công khai vẫn qua được bộ lọc. Xem [kết quả và giới hạn](docs/VERIFICATION.md), [kiến trúc](docs/ARCHITECTURE.md).
 
-Install the following software before running the project:
+Tài liệu bàn giao: [chạy, cấu hình và nghiệm thu tại đơn vị](docs/HANDOVER.md). `face-quality-v2` đo độ nét trên crop chuẩn hóa 128×128; nếu đã tự chỉnh `FACE_MIN_SHARPNESS` ở bản cũ, cần hiệu chuẩn lại. Không dùng model phục chế/làm đẹp để tạo mẫu hoặc vượt kiểm tra người thật.
 
-- [Python 3.12](https://www.python.org/downloads/)
-- [uv](https://docs.astral.sh/uv/)
-- [Bun](https://bun.sh/) for the frontend
-- A modern browser with camera support
-- A C/C++ compiler and CMake if `dlib` must be built locally
+## Chạy local
 
-On macOS, the native build tools can be installed with:
+Đưa bản test miễn phí lên Render + Supabase: [cấu hình và kiểm tra deploy](docs/RENDER.md), kèm [Blueprint demo tại repo phát triển](https://github.com/huybitvvt/chamcongeco-next/blob/main/render.yaml). Dịch vụ Vercel/Render Pro hiện có dùng [ghi chú đồng bộ](docs/UPSTREAM_SYNC.md).
+
+Cần Python 3.12, [uv](https://docs.astral.sh/uv/), [Bun](https://bun.sh/) và trình duyệt có camera. Không cần GPU, CMake, dlib hay cơ sở dữ liệu bên ngoài với cấu hình mặc định.
+
+Từ thư mục gốc:
 
 ```bash
-xcode-select --install
-brew install cmake
+uv sync --project backend --frozen
+uv run --project backend python backend/scripts/download_models.py
 ```
 
-Install `uv` and Bun if they are not already available:
+Lệnh chuẩn bị model tải một lần từ nguồn được chỉ định và kiểm tra SHA-256. API không tải model trong lúc nhận diện. Có thể chép đủ 4 tệp đã xác minh vào `backend/models/` để chạy offline.
+
+Mở terminal thứ nhất:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-curl -fsSL https://bun.sh/install | bash
+uv run --project backend uvicorn backend.main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-Restart the terminal after installation if the `uv` or `bun` commands are not
-immediately available.
-
-## 1. Download the project
-
-Clone the repository and enter its directory:
-
-```bash
-git clone <repository-url>
-cd face_regconition
-```
-
-If the project was downloaded as a ZIP file, extract it and open a terminal in
-the extracted `face_regconition` directory instead.
-
-## 2. Install backend dependencies
-
-From the repository root:
-
-```bash
-uv python install 3.12
-uv sync --project backend
-```
-
-This creates `backend/.venv` and installs FastAPI, Uvicorn, OpenCV,
-`face_recognition`, and the remaining Python dependencies from
-`backend/uv.lock`.
-
-## 3. Install frontend dependencies
+Terminal thứ hai:
 
 ```bash
 cd frontend
-bun install
-cd ..
+bun install --frozen-lockfile
+bun run dev --host 127.0.0.1
 ```
 
-## 4. Start the backend
+Mở **http://127.0.0.1:5173**. Vite chuyển `/api` đến backend; không đặt khóa bí mật trong `VITE_*`. Giao diện cần cả frontend và backend đang chạy.
 
-Open the first terminal and run:
+Lệnh dev/build tự chuẩn bị model hướng dẫn camera và WASM đã pin/checksum, phục vụ từ cùng địa chỉ ứng dụng. Lần đầu cần Internet để tải tài nguyên; những lần sau dùng cache trên đĩa. Chỉ nạp vào trình duyệt khi bấm bắt đầu thu, không gọi API AI bên ngoài. Để chuẩn bị trước: `cd frontend` rồi `bun run prepare:vision`. Chi tiết tại [tự thu 5 góc](docs/AUTO_ENROLLMENT.md).
+
+Mặc định development trên localhost không yêu cầu mã truy cập. Để bật xác thực, chép `backend/.env.example` thành `backend/.env`, đặt hai mã khác nhau và đặt `APP_ENV=production`. Tệp này được backend tự đọc; biến môi trường hệ thống được ưu tiên. Sinh mã bằng:
 
 ```bash
-cd backend
-uv run uvicorn --app-dir src backend.main:app --reload
+python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-The backend is available at:
+Chạy hai lần để có mã quản trị và mã trạm. Nhập mã trên màn hình truy cập; mã được giữ trong `sessionStorage` của tab, không nhúng vào bản build. Chọn **Khóa phiên truy cập** sau khi quản trị. Không chia sẻ mã quản trị cho trạm chấm công.
 
-- API: <http://127.0.0.1:8000>
-- Interactive API documentation: <http://127.0.0.1:8000/docs>
+## Sử dụng
 
-Running the command from `backend/` ensures that the application uses:
+1. Quản trị viên điền tên, xác nhận đồng ý rồi bấm **Bắt đầu thu 5 góc**. Nhân viên nhìn thẳng, quay trái/phải, ngẩng/cúi nhẹ theo chỉ dẫn; hệ thống tự chọn ảnh, kiểm tra ngay trên server rồi mới đánh dấu từng góc. Đủ **Đã kiểm tra 5/5 góc** thì camera tự dừng. Xem lại rồi bấm **Lưu nhân viên**. Có thể chụp lại riêng góc lỗi hoặc chọn **Tải ảnh lên** để dùng 1–5 ảnh có sẵn.
+2. Nhân viên bấm **Chấm công**, nhìn thẳng camera. Chỉ một người trong khung hình. Lượt đầu ngày ghi giờ vào; lượt tiếp theo sau khoảng chống bấm lặp ghi giờ ra.
+3. Chỉ biên nhận `confirmed` mới hiển thị **Đã lưu**. Khi mất mạng, bấm lại sẽ kiểm tra lượt đang chờ trước khi tạo lượt mới.
+4. Hồ sơ cũ có nhãn **Cần cập nhật khuôn mặt**: quản trị viên chọn **Cập nhật ảnh** trên đúng nhân viên. Mã nhân viên và lịch sử công được giữ nguyên.
 
-```text
-backend/data/employees.csv
-backend/data/attendance.csv
-```
+Máy chủ ghi giờ theo `Asia/Ho_Chi_Minh`; đồng bộ đồng hồ/NTP khi triển khai. Bản này hỗ trợ **một lần vào và một lần ra/người/ngày**, chưa có ca qua đêm, nhiều ca hoặc chỉnh công thủ công.
 
-Alternatively, run it from the repository root with an explicit data path:
+## Dữ liệu, chuyển đổi và triển khai
+
+- SQLite + ảnh: `backend/data/runtime/`. Model: `backend/models/`. Các thư mục này không đưa lên Git.
+- Không tự chuyển 128 chiều sang 512 chiều. [Hướng dẫn nhập CSV, Supabase và quay lại dlib](docs/MIGRATION.md).
+- [Docker Compose, HTTPS, sao lưu và vận hành](docs/OPERATIONS.md). Để dùng camera từ máy khác/điện thoại, cần HTTPS.
+- `/healthz`: tiến trình; `/readyz`: model, gallery và kết nối kho dữ liệu; `/docs`: hợp đồng API. API nghiệp vụ yêu cầu Bearer key khi bật xác thực.
+- Đầu vào ảnh JPEG/PNG, tối đa 5 MB/ảnh, 12 triệu pixel. Gallery quá hạn đồng bộ thì từ chối chấm công thay vì dùng dữ liệu cũ vô thời hạn.
+
+## Kiểm tra
 
 ```bash
-FACE_DATA_DIR=backend/data uv run --project backend \
-  uvicorn --app-dir backend/src backend.main:app --reload
-```
-
-## 5. Start the frontend
-
-Keep the backend running. Open a second terminal from the repository root and
-run:
-
-```bash
-cd frontend
-bun run dev
-```
-
-Open <http://localhost:5173> in the browser and allow camera access when asked.
-Camera access normally requires either `localhost` or an HTTPS connection.
-
-## Using the application
-
-### Enroll an employee
-
-1. Open the **Employee enrollment** tab.
-2. Enter the employee's name.
-3. Select a JPG, JPEG, or PNG image.
-4. Use a clear image containing exactly one visible face.
-5. Submit the form.
-
-The backend detects the face, creates its encoding, and adds the employee to
-`backend/data/employees.csv`.
-
-### Record attendance
-
-1. Open the **Attendance camera** tab.
-2. Allow browser camera permission.
-3. Position the employee's face clearly inside the camera view.
-4. Wait for the recognition result.
-
-After a successful match, the employee is marked as arrived and a row is added
-to `backend/data/attendance.csv`. An employee receives only one attendance row
-per day, even when recognized multiple times.
-
-## API endpoints
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/employees` | Enroll an employee from a name and image |
-| `GET` | `/api/employees` | List employees with today's attendance |
-| `POST` | `/api/recognize` | Recognize faces in a camera frame |
-| `GET` | `/api/attendance` | List attendance, optionally by date |
-
-## Configuration
-
-The defaults work for local development. Backend settings can be changed with
-environment variables:
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `FACE_DATA_DIR` | `data` | Directory containing the CSV files |
-| `FACE_RECOGNITION_TOLERANCE` | `0.45` | Conservative maximum distance accepted as a match |
-| `FACE_RECOGNITION_FRAME_SCALE` | `0.5` | Scale applied before live recognition |
-| `FACE_DETECTION_MODEL` | `hog` | Face detector: `hog` or `cnn` |
-| `FACE_ANTI_SPOOFING_ENABLED` | `true` | Run DeepFace's anti-spoofing check before identity recognition |
-
-Live recognition checks each camera frame with DeepFace anti-spoofing before
-matching the existing employee encoding. A spoof is rejected with HTTP 403; if
-the anti-spoof model cannot load, recognition fails closed with HTTP 503. The
-first check downloads DeepFace's model weights, so the Render service needs
-outbound access and enough runtime memory for PyTorch and the model.
-
-## Store data in Supabase
-
-The backend supports Supabase PostgreSQL. To set up a new Supabase project:
-
-1. Open your Supabase project.
-2. In the project's **SQL Editor**, run [`backend/supabase/schema.sql`](backend/supabase/schema.sql).
-   This creates the `employees` and `attendance` tables, employee ID sequence,
-   uniqueness constraints, and service-role-only access.
-3. In **Project Settings → API Keys**, copy the server-side **Secret key**. A
-   publishable key is for public clients and cannot access these service-role-only
-   tables through this backend.
-4. Set the backend variables in PowerShell:
-
-   ```powershell
-   $env:STORAGE_BACKEND = "supabase"
-   $env:SUPABASE_URL = "https://crcqyaphmaxgkrhffevl.supabase.co"
-   $env:SUPABASE_SECRET_KEY = "<sb_secret_server_key>"
-   ```
-
-5. Start the backend from `backend/` as usual. Keep `SUPABASE_SECRET_KEY` on
-   the backend only; never put it in frontend variables or commit it to Git.
-
-The app will write new enrollments and attendance to Supabase when started with
-`STORAGE_BACKEND=supabase`. To import existing CSV records, first run the
-migration script without `--apply` to validate them, then add `--apply` to
-import after reviewing the dry-run result:
-
-```powershell
-uv run python scripts/migrate_csv_to_supabase.py
-uv run python scripts/migrate_csv_to_supabase.py --apply
-```
-
-The apply command requires `SUPABASE_URL` and `SUPABASE_SECRET_KEY` in the
-environment. See [`docs/supabase_implement_spec.md`](docs/supabase_implement_spec.md)
-for the complete setup and migration notes.
-
-## Deploying the backend to Render
-
-Set the Render service's root directory to `backend`. Use this build command so
-Render installs the prebuilt `dlib-bin` wheel and skips compiling the `dlib`
-source distribution (the two distributions provide the same `dlib` Python
-module):
-
-```bash
-uv lock && uv sync --frozen --no-dev --no-install-package dlib
-```
-
-Use this start command:
-
-```bash
-uv run --no-sync uvicorn --app-dir src backend.main:app --host 0.0.0.0 --port $PORT
-```
-
-Keep `dlib-bin` in `backend/pyproject.toml`; the lock command updates
-`backend/uv.lock` during the Render build. Do not remove
-`--no-install-package dlib` from the sync command, or Render will try to
-compile `dlib` from source again.
-| `FACE_ENCODING_MODEL` | `small` | Face landmarks model: `small` or `large` |
-| `FACE_DETECTION_UPSAMPLE` | `1` | Detection upsample count |
-| `FACE_ENCODING_JITTERS` | `1` | Face encoding sample count |
-| `FACE_MAX_UPLOAD_BYTES` | `5242880` | Maximum uploaded image size |
-| `FACE_TIMEZONE` | `Asia/Ho_Chi_Minh` | Attendance timezone |
-| `FACE_LOG_LEVEL` | `INFO` | Backend logging level |
-| `FACE_CORS_ORIGINS` | local ports | Comma-separated allowed frontend origins |
-
-To display detailed backend logs:
-
-```bash
-cd backend
-FACE_LOG_LEVEL=DEBUG uv run uvicorn --app-dir src backend.main:app --reload
-```
-
-The frontend uses `http://127.0.0.1:8000` by default. To use another backend,
-create `frontend/.env.local`:
-
-```env
-VITE_API_URL=http://127.0.0.1:8000
-```
-
-Restart the frontend after changing this file.
-
-## Run checks
-
-Backend tests:
-
-```bash
-cd backend
-PYTHONPATH=src uv run python -m unittest discover -s tests -q
-```
-
-Frontend lint and production build:
-
-```bash
+uv run --project backend pytest backend/tests -q
+uv run --project backend ruff check backend/src/backend/runtime backend/scripts/download_models.py backend/scripts/import_csv.py backend/scripts/benchmark_runtime.py
 cd frontend
 bun run lint
+bun run test:unit
 bun run build
+bunx playwright install chromium
+# Mở bun run dev ở terminal khác trước khi chạy:
+node --test --test-concurrency=1 tests/*.mjs
+node scripts/smoke-enrollment-worker.mjs
+cd ../tools
+bun install --frozen-lockfile
+bun run test:sql
 ```
 
-## Troubleshooting
+Trên Windows có Edge, đặt `$env:PLAYWRIGHT_CHANNEL='msedge'` trước lệnh test trình duyệt. CI tự dựng Vite và chạy các kiểm tra, thêm build hai container.
 
-### `ModuleNotFoundError: No module named 'backend'`
+Test mặc định dùng dữ liệu tổng hợp và model giả ở ranh giới inference, không tải trọng số. Test SQL dùng PostgreSQL nhúng PGlite; không thay thế nghiệm thu Supabase thật. Đo API với model thật bằng script [benchmark_runtime.py](backend/scripts/benchmark_runtime.py), luôn dùng cơ sở dữ liệu tạm riêng.
 
-The backend uses a `src/` package layout. Include the application directory in
-the Uvicorn command:
+`uv sync --project backend --extra legacy` cài thêm dlib để chạy bộ regression cũ hoặc adapter `FACE_ENGINE=dlib`. Code prototype được giữ để đối chiếu; entrypoint sử dụng là **`backend.main:app`**.
 
-```bash
-cd backend
-uv run uvicorn --app-dir src backend.main:app --reload
-```
-
-### The camera is visible but no recognition request appears
-
-Open the browser developer console and look for messages beginning with
-`[recognition]`. The backend terminal should receive requests like:
+## Cấu trúc
 
 ```text
-POST /api/recognize HTTP/1.1 200 OK
+backend/src/backend/runtime/  API, ONNX, gallery, service, SQLite/Supabase, ảnh riêng
+backend/scripts/              chuẩn bị model, nhập CSV, benchmark độc lập
+backend/supabase/             schema và migration RPC
+backend/tests/                kiểm tra luồng, lỗi, đồng thời và tương thích cũ
+frontend/src/                 giao diện Carbon, camera, phân quyền và biên nhận
+frontend/tests/               kiểm tra trình duyệt desktop/mobile với fake camera
+tools/                        kiểm tra hợp đồng PostgreSQL
+docs/                         kiến trúc, vận hành, chuyển đổi, bằng chứng kiểm tra
 ```
 
-If the backend shows only `GET /api/employees`, hard-refresh the frontend and
-confirm that the browser has camera permission.
-
-### A face is detected but not matched
-
-Check the backend logs for `Face not matched` and its nearest distance. Enroll
-the employee with a clear, front-facing image under good lighting. Avoid
-loosening the recognition tolerance unless the false-match tradeoff is
-understood.
-
-### `pkg_resources is deprecated` warning
-
-This warning comes from the current `face_recognition_models` package. It does
-not prevent the server or recognition pipeline from running.
-
-## Privacy and limitations
-
-- Face encodings and attendance records remain in local CSV files.
-- This prototype does not implement liveness detection; a photograph may be
-  accepted as a real face.
-- CSV storage is intended for a local prototype and is not suitable for a
-  high-concurrency production deployment.
+Ghi nhận mã nguồn và nguồn model tại [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

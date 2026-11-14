@@ -1,2 +1,1 @@
 """Domain and API models."""
-

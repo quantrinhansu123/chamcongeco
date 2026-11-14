@@ -1,0 +1,44 @@
+{
+  "scope": "localhost HTTP, real CPU ONNX/PAD, SQLite WAL + fsynced private JPEG; synthetic gallery/test clock",
+  "employees": 200,
+  "templates_per_employee": 5,
+  "model": "buffalo_sc:9cc6e4a75f0e2bf0b1aed94578f144d15175f357bdc05e815e5c4a02b319eb4f",
+  "cpu_threads": 1,
+  "warm_up_ms": 433.0,
+  "full_punch": {
+    "samples": 600,
+    "p50_ms": 64.16,
+    "p95_ms": 103.0,
+    "max_ms": 304.86
+  },
+  "receipt_retry": {
+    "samples": 600,
+    "p50_ms": 5.49,
+    "p95_ms": 7.84,
+    "max_ms": 9.74
+  },
+  "upstream_spoof_smoke": [
+    {
+      "fixture": "image_F1.jpg",
+      "status": 403,
+      "ms": 23.45
+    },
+    {
+      "fixture": "image_F2.jpg",
+      "status": 403,
+      "ms": 23.08
+    }
+  ],
+  "four_client_burst": {
+    "200": 24,
+    "429": 16
+  },
+  "burst_latency": {
+    "samples": 40,
+    "p50_ms": 104.4,
+    "p95_ms": 144.39,
+    "max_ms": 200.65
+  },
+  "evidence_files": 601,
+  "expected_evidence_files": 601
+}

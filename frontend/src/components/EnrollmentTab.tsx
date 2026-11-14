@@ -1,234 +1,144 @@
 import { Button, Checkbox, InlineNotification, TextInput } from '@carbon/react'
 import { useEffect, useRef, useState } from 'react'
-import { enrollEmployee } from '../services/api'
-import { useCameraRecognition } from '../hooks/useCameraRecognition'
+import { ApiError, enrollEmployee } from '../services/api'
+import { useAutoEnrollment } from '../hooks/useAutoEnrollment'
+import { POSES } from '../enrollment/types'
+import type { PoseId } from '../enrollment/types'
+import type { EmployeeAttendance } from '../types/face'
+import { AutoCapturePanel } from './AutoCapturePanel'
 
-interface EnrollmentTabProps {
-  onEnrolled: () => void
-}
+interface Props { onEnrolled: () => void; employee?: EmployeeAttendance | null }
+type Message = { type: 'success' | 'error'; text: string } | null
 
-type SubmissionMessage = { type: 'success' | 'error'; text: string } | null
-
-const ignoreAttendance = () => {}
-
-function nameFromFilename(filename: string): string {
-  const withoutExtension = filename.replace(/\.[^.]+$/, '')
-  return withoutExtension
-    .replace(/[-_]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
-export function EnrollmentTab({ onEnrolled }: EnrollmentTabProps) {
-  const [name, setName] = useState('')
-  const [file, setFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+export function EnrollmentTab({ onEnrolled, employee }: Props) {
+  const [name, setName] = useState(employee?.name ?? '')
+  const [mode, setMode] = useState<'guided' | 'upload'>('guided')
+  const [files, setFiles] = useState<File[]>([])
+  const [urls, setUrls] = useState<string[]>([])
   const [consented, setConsented] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [capturing, setCapturing] = useState(false)
-  const [message, setMessage] = useState<SubmissionMessage>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const { cameraState, videoRef, error: cameraError, startCamera, stopCamera } = useCameraRecognition({
-    recognitionEnabled: false,
-    onAttendanceUpdated: ignoreAttendance,
-  })
-  const cameraOpen = cameraState === 'active' || cameraState === 'requesting'
+  const [message, setMessage] = useState<Message>(null)
+  const [invalidIndex, setInvalidIndex] = useState<number | null>(null)
+  const submissionRef = useRef<AbortController | null>(null)
+  const submittingRef = useRef(false)
+  const invalidPhotoRef = useRef<File | null>(null)
+  const camera = useAutoEnrollment()
+  const cameraBusy = camera.state === 'loading' || camera.state === 'capturing' || camera.state === 'checking'
+  const complete = POSES.every(pose => camera.photos[pose.id])
+  const success = message?.type === 'success'
 
   useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl)
+    const preview = files.map(file => URL.createObjectURL(file))
+    // Preview URLs are an external resource tied to the chosen files.
+    // oxlint-disable-next-line react/set-state-in-effect
+    setUrls(preview)
+    return () => preview.forEach(url => URL.revokeObjectURL(url))
+  }, [files])
+  useEffect(() => () => submissionRef.current?.abort(), [])
+  const badPhoto = invalidIndex === null ? undefined : camera.photos[POSES[invalidIndex].id]
+  useEffect(() => {
+    if (mode === 'guided' && badPhoto && badPhoto.file !== invalidPhotoRef.current) {
+      // Validation belongs to the selected image; a completed retake replaces it.
+      // oxlint-disable-next-line react/set-state-in-effect
+      setInvalidIndex(null)
+      setMessage(null)
     }
-  }, [previewUrl])
+  }, [badPhoto, mode])
 
-  const selectFile = (selectedFile: File, prefillName = true) => {
-    if (!['image/jpeg', 'image/png'].includes(selectedFile.type)) {
-      setMessage({ type: 'error', text: 'Chọn ảnh JPG hoặc PNG.' })
-      return
+  const selectFiles = (selected: File[]) => {
+    if (submitting || success) return
+    if (files.length + selected.length > 5) { setMessage({ type: 'error', text: 'Chọn tối đa 5 ảnh. Xóa ảnh cũ để thay thế.' }); return }
+    if (selected.some(file => !['image/jpeg', 'image/png'].includes(file.type) || file.size > 5 * 1024 * 1024 || file.size === 0)) {
+      setMessage({ type: 'error', text: 'Chọn ảnh JPG/PNG không rỗng, tối đa 5 MB mỗi ảnh.' }); return
     }
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      setMessage({ type: 'error', text: 'Ảnh phải có dung lượng tối đa 5 MB.' })
-      return
-    }
-    setFile(selectedFile)
-    setPreviewUrl(URL.createObjectURL(selectedFile))
-    if (prefillName && !name.trim()) setName(nameFromFilename(selectedFile.name))
-    setMessage(null)
+    setFiles(previous => [...previous, ...selected]); setMessage(null); setInvalidIndex(null)
+    if (!name.trim() && selected[0]) setName(selected[0].name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\b\w/g, letter => letter.toUpperCase()))
   }
 
-  const capturePhoto = async () => {
-    const video = videoRef.current
-    if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
-      setMessage({ type: 'error', text: 'Chờ hình ảnh camera hiển thị trước khi chụp.' })
-      return
-    }
-    const stream = video.srcObject
-    setCapturing(true)
+  const changeMode = (next: typeof mode) => {
+    if (submitting || next === mode) return
+    camera.clear(); setFiles([]); setMessage(null); setInvalidIndex(null); setMode(next)
+  }
+  const start = (pose?: PoseId, restart?: boolean) => {
+    if (!name.trim() || !consented || submitting || success) return
     setMessage(null)
-    try {
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.min(video.videoWidth, 1280)
-      canvas.height = Math.round(canvas.width * video.videoHeight / video.videoWidth)
-      const context = canvas.getContext('2d')
-      if (!context) throw new Error('Trình duyệt không thể xử lý ảnh camera.')
-      context.drawImage(video, 0, 0, canvas.width, canvas.height)
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, 'image/jpeg', 0.9),
-      )
-      if (videoRef.current !== video || video.srcObject !== stream) return
-      if (!blob) throw new Error('Không thể chụp ảnh. Vui lòng thử lại.')
-      selectFile(new File([blob], 'employee-photo.jpg', { type: 'image/jpeg' }), false)
-      stopCamera()
-    } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Không thể chụp ảnh.' })
-    } finally {
-      setCapturing(false)
-    }
+    if (restart) setInvalidIndex(null)
+    void camera.start(pose, restart)
   }
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!file || !name.trim() || !consented || submitting || cameraOpen || capturing) return
-    setSubmitting(true)
-    setMessage(null)
+    if (!name.trim() || !consented || submittingRef.current || cameraBusy || success || invalidIndex !== null) return
+    const selected = mode === 'guided' ? POSES.flatMap(pose => camera.photos[pose.id] ? [camera.photos[pose.id]!.file] : []) : files
+    if (!selected.length || mode === 'guided' && selected.length !== 5) return
+    const controller = new AbortController()
+    submissionRef.current = controller
+    submittingRef.current = true
+    setSubmitting(true); setMessage(null)
     try {
-      const employee = await enrollEmployee(name.trim(), file)
-      setMessage({
-        type: 'success',
-        text: `Đã đăng ký ${employee.name} · Mã ${employee.employee_id}.`,
-      })
+      const saved = await enrollEmployee(name.trim(), selected, employee?.employee_id, controller.signal, mode === 'guided' ? POSES.map(pose => pose.id) : undefined)
+      if (!controller.signal.aborted) setMessage({ type: 'success', text: `Đã lưu ${saved.name} · Mã ${saved.employee_id} · ${saved.template_count} ảnh khuôn mặt.` })
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : 'Không thể đăng ký nhân viên.',
-      })
-    } finally {
-      setSubmitting(false)
-    }
+      if (!controller.signal.aborted) {
+        const index = error instanceof ApiError && error.imageIndex !== null && error.imageIndex < selected.length ? error.imageIndex : null
+        invalidPhotoRef.current = index === null ? null : selected[index]
+        setInvalidIndex(index)
+        setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Không lưu được hồ sơ. Vui lòng thử lại.' })
+      }
+    } finally { submittingRef.current = false; if (!controller.signal.aborted) setSubmitting(false) }
   }
 
-  return (
-    <section className="panel" aria-labelledby="enrollment-title">
-      <div className="panel-header">
-        <div>
-          <h2 id="enrollment-title">Hồ sơ khuôn mặt</h2>
-          <p>Điền tên, thêm ảnh rõ mặt và xác nhận đồng ý trước khi lưu.</p>
+  return <section className="panel" aria-labelledby="enrollment-title">
+    <div className="panel-header"><div>
+      <h2 id="enrollment-title">{employee ? `Cập nhật khuôn mặt · ${employee.employee_id}` : 'Hồ sơ khuôn mặt'}</h2>
+      <p>{employee ? 'Cập nhật ảnh nhận diện, giữ nguyên mã nhân viên và lịch sử chấm công.' : 'Tự thu 5 góc bằng camera hoặc chọn ảnh có sẵn để đăng ký.'}</p>
+    </div><span className="step-pill">Một người mỗi lượt</span></div>
+    <form onSubmit={event => void submit(event)}>
+      <div className="form-grid">
+        <div className="form-fields">
+          <h3 className="form-section-title">1. Thông tin và đồng ý</h3>
+          <TextInput id="employee-name" labelText="Họ và tên" value={name} readOnly={!!employee} disabled={submitting || cameraBusy || success}
+            maxLength={120} placeholder="Ví dụ: Nguyễn Minh Anh" autoComplete="off"
+            helperText="Kiểm tra họ tên trước khi bắt đầu thu ảnh." onChange={event => setName(event.target.value)} />
+          <div className="consent-box enrollment-consent"><Checkbox id="employee-consent" checked={consented} disabled={submitting || cameraBusy || success}
+            onChange={(_, { checked }) => setConsented(checked)} labelText="Tôi xác nhận nhân viên đã đồng ý lưu dữ liệu sinh trắc học khuôn mặt để chấm công." /></div>
+          <div className="capture-method" role="group" aria-label="Cách thêm ảnh khuôn mặt">
+            <Button kind={mode === 'guided' ? 'primary' : 'tertiary'} type="button" aria-pressed={mode === 'guided'} disabled={submitting || success} onClick={() => changeMode('guided')}>Camera tự động</Button>
+            <Button kind={mode === 'upload' ? 'primary' : 'tertiary'} type="button" aria-pressed={mode === 'upload'} disabled={submitting || success} onClick={() => changeMode('upload')}>Tải ảnh lên</Button>
+          </div>
+          <p className="enrollment-help">{mode === 'guided' ? 'Bắt đầu một lần, quay nhẹ theo chỉ dẫn. Hệ thống tự chọn ảnh rõ cho từng góc.' : 'Chọn 1–5 ảnh cùng người, rõ mặt và đủ sáng. Có thể dùng khi camera không khả dụng.'}</p>
         </div>
-        <span className="step-pill">Ảnh chỉ có một người</span>
+        <div className="camera-column">
+          <h3 className="form-section-title">2. {mode === 'guided' ? 'Tự thu 5 góc khuôn mặt' : 'Ảnh khuôn mặt'}</h3>
+          {mode === 'guided' ? <AutoCapturePanel {...camera} disabled={!name.trim() || !consented || submitting || success} invalidIndex={invalidIndex} onStart={start} /> : <>
+            <label className={`upload-zone${dragging ? ' dragging' : ''}`} htmlFor="face-image"
+              onDragEnter={event => { event.preventDefault(); setDragging(true) }} onDragOver={event => event.preventDefault()}
+              onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); selectFiles(Array.from(event.dataTransfer.files)) }}>
+              <input id="face-image" type="file" multiple disabled={submitting || success || files.length >= 5} accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+                onChange={event => { selectFiles(Array.from(event.target.files ?? [])); event.target.value = '' }} />
+              <div className="upload-copy"><strong>Kéo ảnh vào đây hoặc chọn tệp</strong><span>1–5 ảnh JPG/PNG · Tối đa 5 MB mỗi ảnh</span></div>
+            </label>
+            <ol className="upload-previews" aria-label="Ảnh đã chọn">{files.map((file, index) => <li key={`${file.name}-${index}`} className={invalidIndex === index ? 'invalid' : undefined}>
+              {urls[index] ? <img src={urls[index]} alt={`Ảnh khuôn mặt nhân viên ${index + 1}`} /> : null}
+              <span>{file.name}{invalidIndex === index ? ' · Cần thay ảnh này' : ''}</span>
+              <Button kind="ghost" size="sm" type="button" disabled={submitting || success} aria-label={`Xóa ảnh ${index + 1}`} onClick={() => { setFiles(files.filter((_, i) => i !== index)); setInvalidIndex(null); setMessage(null) }}>Xóa</Button>
+            </li>)}</ol>
+          </>}
+        </div>
+        <div className="enrollment-confirm">
+          <h3 className="form-section-title">3. Kiểm tra và lưu</h3>
+          <p>{mode === 'guided' ? 'Thu đủ 5 góc và kiểm tra các ảnh trước khi lưu. Có thể chụp lại từng góc.' : 'Kiểm tra các ảnh và họ tên trước khi lưu.'}</p>
+          <Button className="enrollment-submit" type="submit" disabled={!name.trim() || !consented || submitting || success || cameraBusy || invalidIndex !== null || (mode === 'guided' ? !complete : !files.length)}>
+            {submitting ? 'Đang lưu hồ sơ…' : 'Lưu nhân viên'}
+          </Button>
+          {message ? <div className="submission-result"><InlineNotification kind={message.type} role={message.type === 'error' ? 'alert' : 'status'}
+            title={message.type === 'success' ? 'Đăng ký thành công' : 'Chưa thể lưu hồ sơ'} subtitle={message.text} hideCloseButton lowContrast />
+            {success ? <><Button kind="ghost" type="button" className="message-action" onClick={onEnrolled}>Chuyển sang chấm công</Button>
+              {!employee ? <Button kind="ghost" type="button" onClick={() => { camera.clear(); setName(''); setFiles([]); setConsented(false); setMessage(null); setInvalidIndex(null); document.getElementById('employee-name')?.focus() }}>Đăng ký người tiếp theo</Button> : null}</> : null}
+          </div> : null}
+        </div>
       </div>
-
-      <form onSubmit={handleSubmit}>
-        <div className="form-grid">
-          <div className="form-fields">
-            <h3 className="form-section-title">1. Thông tin nhân viên</h3>
-            <TextInput id="employee-name" labelText="Họ và tên" value={name}
-              maxLength={120} placeholder="Ví dụ: Nguyễn Minh Anh" autoComplete="off"
-              helperText="Kiểm tra họ tên được gợi ý từ tên tệp ảnh trước khi lưu."
-              onChange={(event) => setName(event.target.value)} />
-          </div>
-
-          <div className="camera-column">
-            <h3 className="form-section-title">2. Ảnh khuôn mặt</h3>
-            <div className="camera-toolbar">
-              <Button
-                kind="tertiary"
-                type="button"
-                disabled={submitting || capturing || cameraState === 'requesting'}
-                onClick={() => cameraState === 'active' ? void capturePhoto() : void startCamera()}
-              >
-                {cameraState === 'requesting' ? 'Đang mở camera…' : capturing ? 'Đang chụp…' : cameraState === 'active' ? 'Chụp ảnh' : previewUrl ? 'Chụp lại' : 'Mở camera'}
-              </Button>
-              {cameraOpen ? (
-                <Button kind="tertiary" type="button" onClick={stopCamera}>
-                  Hủy chụp
-                </Button>
-              ) : null}
-            </div>
-            {cameraError ? <InlineNotification kind="error" role="alert" title="Không thể mở camera" subtitle={cameraError} hideCloseButton lowContrast /> : null}
-            <div className="camera-frame" style={{ display: cameraOpen ? undefined : 'none' }}>
-              <video ref={videoRef} muted playsInline aria-label="Camera đăng ký trực tiếp" />
-            </div>
-            {!cameraOpen ? (
-              <label
-                className={`upload-zone${dragging ? ' dragging' : ''}${previewUrl ? ' has-preview' : ''}`}
-                htmlFor="face-image"
-                onDragEnter={(event) => {
-                  event.preventDefault()
-                  setDragging(true)
-                }}
-                onDragOver={(event) => event.preventDefault()}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(event) => {
-                  event.preventDefault()
-                  setDragging(false)
-                  const droppedFile = event.dataTransfer.files[0]
-                  if (droppedFile) selectFile(droppedFile)
-                }}
-              >
-                <input
-                  ref={inputRef}
-                  id="face-image"
-                  type="file"
-                  accept="image/jpeg,image/png,.jpg,.jpeg,.png"
-                  onChange={(event) => {
-                    const selectedFile = event.target.files?.[0]
-                    if (selectedFile) selectFile(selectedFile)
-                  }}
-                />
-                {previewUrl && file ? (
-                  <>
-                    <img className="image-preview" src={previewUrl} alt="Ảnh khuôn mặt nhân viên" />
-                    <span className="preview-overlay">
-                      <span>{file.name}</span>
-                      <span>Đổi ảnh</span>
-                    </span>
-                  </>
-                ) : (
-                  <div className="upload-copy">
-                    <span className="upload-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24">
-                        <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14.5V19h14v-4.5" />
-                      </svg>
-                    </span>
-                    <strong>Kéo ảnh vào đây hoặc chọn tệp</strong>
-                    <span>JPG hoặc PNG · Tối đa 5 MB</span>
-                  </div>
-                )}
-              </label>
-            ) : null}
-          </div>
-          <div className="enrollment-confirm">
-            <h3 className="form-section-title">3. Xác nhận và lưu</h3>
-            <div className="consent-box">
-              <Checkbox id="employee-consent" checked={consented}
-                onChange={(_, { checked }) => setConsented(checked)}
-                labelText="Tôi xác nhận nhân viên đã đồng ý lưu dữ liệu sinh trắc học khuôn mặt để chấm công." />
-            </div>
-            <Button
-              className="enrollment-submit"
-              type="submit"
-              disabled={!file || !name.trim() || !consented || submitting || cameraOpen || capturing}
-            >
-              {submitting ? <span className="spinner" /> : null}
-              {submitting ? 'Đang đăng ký…' : 'Lưu nhân viên'}
-            </Button>
-
-            {message ? (
-              <div className="submission-result">
-                <InlineNotification kind={message.type} role={message.type === 'error' ? 'alert' : 'status'}
-                  title={message.type === 'success' ? 'Đăng ký thành công' : 'Chưa thể đăng ký'}
-                  subtitle={message.text} hideCloseButton lowContrast />
-                {message.type === 'success' ? (
-                  <Button kind="ghost" className="message-action" type="button" onClick={onEnrolled}>
-                    Chuyển sang chấm công
-                  </Button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </form>
-    </section>
-  )
+    </form>
+  </section>
 }

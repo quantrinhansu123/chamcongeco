@@ -24,6 +24,7 @@ test('Carbon navigation works on desktop and mobile without horizontal overflow'
   try {
     const page = await browser.newPage({ reducedMotion: 'reduce' })
     const errors = []
+    await page.route('**/api/session', route => route.fulfill({ json: { role: 'admin', authentication_required: false } }))
     page.on('pageerror', error => errors.push(error.message))
     await page.route('**/api/employees', route => route.fulfill({ json: [] }))
     await mkdir('node_modules/.cache/layout-preview', { recursive: true })

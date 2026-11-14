@@ -1,0 +1,14 @@
+{
+  "size": 128,
+  "policy": {
+    "version": "face-quality-v2", "crop_size": 128, "min_sharpness": 40,
+    "min_brightness": 45, "max_brightness": 220, "min_face_pixels": 80
+  },
+  "cases": [
+    {"kind": "flat", "brightness": 120, "sharpness": 0},
+    {"kind": "color", "brightness": 140.75, "sharpness": 0},
+    {"kind": "checker", "brightness": 60, "sharpness": 25600},
+    {"kind": "ramp", "brightness": 127.5, "sharpness": 0},
+    {"kind": "step", "brightness": 130, "sharpness": 158.73015873015873}
+  ]
+}

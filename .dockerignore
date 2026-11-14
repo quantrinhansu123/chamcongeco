@@ -1,0 +1,16 @@
+.git
+**/.venv
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/dist
+**/data
+**/models/*.onnx
+**/*.log
+**/.env
+**/.env.*
+**/.DS_Store
+artifacts
+frontend/public/vision
+.agents

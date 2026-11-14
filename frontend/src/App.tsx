@@ -1,22 +1,30 @@
 ﻿import { useState } from 'react'
 import {
   Breadcrumb, BreadcrumbItem, Column, Content, Grid, Header,
-  HeaderMenuButton, SideNav, SideNavItems, SideNavLink, SkipToContent,
+  HeaderMenuButton, SideNav, SideNavItems, SideNavLink, SkipToContent, Button,
 } from '@carbon/react'
 import { AttendanceTab } from './components/AttendanceTab'
 import { EnrollmentTab } from './components/EnrollmentTab'
+import { SessionGate } from './components/SessionGate'
+import type { EmployeeAttendance, Session } from './types/face'
 import './App.css'
 
 type ActiveTab = 'enrollment' | 'attendance'
 
 function App() {
+  return <SessionGate>{(session, logout) => <Workspace session={session} logout={logout} />}</SessionGate>
+}
+
+function Workspace({ session, logout }: { session: Session; logout: () => void }) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('attendance')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [editing, setEditing] = useState<EmployeeAttendance | null>(null)
   const title = activeTab === 'attendance' ? 'Chấm công' : 'Đăng ký nhân viên'
 
   const navigate = (tab: ActiveTab) => {
     setActiveTab(tab)
     setMenuOpen(false)
+    setEditing(null)
   }
 
   return (
@@ -44,11 +52,13 @@ function App() {
             <SideNavLink as="button" type="button" tabIndex={0} aria-current={activeTab === 'attendance' ? 'page' : undefined} isActive={activeTab === 'attendance'} onClick={() => navigate('attendance')}>
               Chấm công
             </SideNavLink>
-            <SideNavLink as="button" type="button" tabIndex={0} aria-current={activeTab === 'enrollment' ? 'page' : undefined} isActive={activeTab === 'enrollment'} onClick={() => navigate('enrollment')}>
+            {session.role === 'admin' ? <SideNavLink as="button" type="button" tabIndex={0} aria-current={activeTab === 'enrollment' ? 'page' : undefined} isActive={activeTab === 'enrollment'} onClick={() => navigate('enrollment')}>
               Đăng ký nhân viên
-            </SideNavLink>
+            </SideNavLink> : null}
           </SideNavItems>
-          <div className="sidebar-note"><strong>Nhận diện khuôn mặt</strong><p>Đăng ký một lần, chấm công mỗi ngày.</p><span>Múi giờ Việt Nam · UTC+7</span></div>
+          <div className="sidebar-note"><strong>Nhận diện khuôn mặt</strong><p>Đăng ký một lần, chấm công mỗi ngày.</p><span>Múi giờ Việt Nam · UTC+7</span>
+            {session.authentication_required ? <Button kind="ghost" onClick={logout}>Khóa phiên truy cập</Button> : null}
+          </div>
         </SideNav>
       </Header>
 
@@ -70,9 +80,9 @@ function App() {
             </section>
             <div className="workspace">
               {activeTab === 'enrollment' ? (
-                <EnrollmentTab onEnrolled={() => navigate('attendance')} />
+                <EnrollmentTab employee={editing} onEnrolled={() => navigate('attendance')} />
               ) : (
-                <AttendanceTab />
+                <AttendanceTab onReenroll={session.role === 'admin' ? employee => { setEditing(employee); setActiveTab('enrollment') } : undefined} />
               )}
             </div>
             <footer className="app-footer">

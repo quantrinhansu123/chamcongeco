@@ -1,0 +1,11 @@
+{
+  "name": "attendly-verification",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:sql": "node test-supabase.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.16"
+  }
+}
