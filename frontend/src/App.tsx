@@ -1,4 +1,8 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
+import {
+  Breadcrumb, BreadcrumbItem, Column, Content, Grid, Header,
+  HeaderMenuButton, SideNav, SideNavItems, SideNavLink, SkipToContent,
+} from '@carbon/react'
 import { AttendanceTab } from './components/AttendanceTab'
 import { EnrollmentTab } from './components/EnrollmentTab'
 import './App.css'
@@ -7,68 +11,77 @@ type ActiveTab = 'enrollment' | 'attendance'
 
 function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('attendance')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const title = activeTab === 'attendance' ? 'Chấm công' : 'Đăng ký nhân viên'
+
+  const navigate = (tab: ActiveTab) => {
+    setActiveTab(tab)
+    setMenuOpen(false)
+  }
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <a className="brand" href="#top" aria-label="Attendly home">
-          <span className="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-              <path d="M8.5 4.75a3.25 3.25 0 1 0 0 6.5 3.25 3.25 0 0 0 0-6.5ZM3.75 19v-1.5A3.75 3.75 0 0 1 7.5 13.75h2A3.75 3.75 0 0 1 13.25 17.5V19M16.25 7.25h4m-2-2v4m-2 5.5h4m-2-2v4" />
-            </svg>
-          </span>
-          <span>Attendly</span>
-        </a>
-        <div className="header-meta">
-          <span className="live-dot" />
-          Chấm công khuôn mặt
-        </div>
-      </header>
+      <Header aria-label="Attendly" className="app-header">
+        <SkipToContent href="#main-content">Đến nội dung chính</SkipToContent>
+        <HeaderMenuButton
+          aria-label={menuOpen ? 'Đóng menu' : 'Mở menu'}
+          isActive={menuOpen}
+          onClick={() => setMenuOpen(!menuOpen)}
+        />
+        <SideNav
+          aria-label="Điều hướng chính"
+          expanded={menuOpen}
+          onToggle={() => setMenuOpen(false)}
+          onOverlayClick={() => setMenuOpen(false)}
+          onSideNavBlur={() => setMenuOpen(false)}
+          className="app-sidebar"
+        >
+          <div className="sidebar-heading">
+            <img className="brand-logo" src="/logo.jpg" alt="Logo chấm công" />
+            <span>KHÔNG GIAN LÀM VIỆC</span>
+          </div>
+          <SideNavItems>
+            <SideNavLink as="button" type="button" tabIndex={0} aria-current={activeTab === 'attendance' ? 'page' : undefined} isActive={activeTab === 'attendance'} onClick={() => navigate('attendance')}>
+              Chấm công
+            </SideNavLink>
+            <SideNavLink as="button" type="button" tabIndex={0} aria-current={activeTab === 'enrollment' ? 'page' : undefined} isActive={activeTab === 'enrollment'} onClick={() => navigate('enrollment')}>
+              Đăng ký nhân viên
+            </SideNavLink>
+          </SideNavItems>
+          <div className="sidebar-note"><strong>Nhận diện khuôn mặt</strong><p>Đăng ký một lần, chấm công mỗi ngày.</p><span>Múi giờ Việt Nam · UTC+7</span></div>
+        </SideNav>
+      </Header>
 
-      <main id="top" className="main-content">
-        <section className="intro" aria-labelledby="page-title">
-          <p className="eyebrow">Face recognition attendance</p>
-          <h1 id="page-title">A faster way to welcome your team.</h1>
-          <p className="intro-copy">
-            Enroll employees once, then let the attendance camera recognize them
-            as they arrive.
-          </p>
-        </section>
-
-        <nav className="tabs" aria-label="Attendance workflows">
-          <button
-            className={activeTab === 'enrollment' ? 'tab active' : 'tab'}
-            type="button"
-            aria-selected={activeTab === 'enrollment'}
-            onClick={() => setActiveTab('enrollment')}
-          >
-            <span className="tab-number">01</span>
-            Employee enrollment
-          </button>
-          <button
-            className={activeTab === 'attendance' ? 'tab active' : 'tab'}
-            type="button"
-            aria-selected={activeTab === 'attendance'}
-            onClick={() => setActiveTab('attendance')}
-          >
-            <span className="tab-number">02</span>
-            Attendance camera
-          </button>
-        </nav>
-
-        <div className="workspace">
-          {activeTab === 'enrollment' ? (
-            <EnrollmentTab onEnrolled={() => setActiveTab('attendance')} />
-          ) : (
-            <AttendanceTab />
-          )}
-        </div>
-      </main>
-
-      <footer>
-        <span>Dữ liệu được lưu qua máy chủ chấm công.</span>
-        <span>Xác minh khuôn mặt thật trước khi ghi công.</span>
-      </footer>
+      <Content id="main-content" className="main-content" tabIndex={-1}>
+        <Grid fullWidth className="page-grid">
+          <Column sm={4} md={8} lg={16}>
+            <Breadcrumb noTrailingSlash aria-label="Đường dẫn">
+              <BreadcrumbItem>Không gian làm việc</BreadcrumbItem>
+              <BreadcrumbItem isCurrentPage>{title}</BreadcrumbItem>
+            </Breadcrumb>
+            <section className="intro" aria-labelledby="page-title">
+              <div>
+                <h1 id="page-title">{title}</h1>
+                <p className="intro-copy">{activeTab === 'attendance'
+                  ? 'Ghi nhận giờ vào, giờ ra và theo dõi nhân viên trong ngày.'
+                  : 'Thêm hồ sơ khuôn mặt để nhân viên bắt đầu chấm công.'}</p>
+              </div>
+              <span className="page-label">Attendly / Nhân sự</span>
+            </section>
+            <div className="workspace">
+              {activeTab === 'enrollment' ? (
+                <EnrollmentTab onEnrolled={() => navigate('attendance')} />
+              ) : (
+                <AttendanceTab />
+              )}
+            </div>
+            <footer className="app-footer">
+              <span>Xác minh khuôn mặt thật trước khi ghi công.</span>
+              <span>Giờ chấm công được ghi từ máy chủ.</span>
+            </footer>
+          </Column>
+        </Grid>
+      </Content>
     </div>
   )
 }

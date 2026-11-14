@@ -1,0 +1,78 @@
+@use 'sass:map';
+@use '@carbon/type/scss/font-family' as fonts;
+fonts.$font-families: map.set(fonts.$font-families, 'sans', ('Inter', 'Segoe UI', sans-serif));
+@use '@carbon/react' with ($css--font-face: false);
+@use '@carbon/react/scss/type';
+@use '@carbon/react/scss/spacing';
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/InterVariable.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+.app-shell {
+  @include type.type-style('body-01');
+  --cds-spacing-05: #{spacing.$spacing-05};
+  --cds-spacing-06: #{spacing.$spacing-06};
+  --cds-spacing-07: #{spacing.$spacing-07};
+}
+
+.intro h1 {
+  @include type.type-style('heading-05');
+}
+
+.panel-header h2 {
+  @include type.type-style('heading-03');
+}
+
+.employee-card-header h3, .form-section-title {
+  @include type.type-style('heading-02');
+}
+
+.intro-copy {
+  @include type.type-style('body-02');
+}
+
+.panel-header p, .consent-box, .message, .camera-placeholder p,
+.empty-list, .list-error, .sidebar-note, .sidebar-note p, .upload-copy strong {
+  @include type.type-style('body-01');
+}
+
+.message-action,
+.camera-status strong, .camera-placeholder strong, .recognition-strip {
+  @include type.type-style('body-compact-01');
+}
+
+.field-label, .page-label, .sidebar-heading,
+.field-help, .sidebar-note span, .step-pill, .status-pill,
+.upload-copy span, .preview-overlay, .camera-status span:last-child,
+.camera-column > p, .face-label, .spoof-warning span,
+.attendance-confirmation-badge, .arrival-time small,
+.employee-card-header p, .count-badge, .employee-id, .app-footer {
+  @include type.type-style('label-01');
+}
+
+.spoof-warning strong {
+  @include type.type-style('heading-compact-01');
+}
+
+.attendance-confirmation-copy strong, .arrival-time time {
+  @include type.type-style('heading-03');
+  font-weight: 600;
+}
+
+.employee-name {
+  @include type.type-style('heading-02');
+}
+
+.attendance-confirmation-copy span {
+  @include type.type-style('body-02');
+}
+
+.camera-status strong, .camera-placeholder strong,
+.employee-name, .attendance-confirmation-copy strong, .message-action, .upload-copy strong {
+  font-weight: 600;
+}

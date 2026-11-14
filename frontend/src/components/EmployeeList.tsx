@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { InlineNotification, TextInput } from '@carbon/react'
 import type { EmployeeAttendance } from '../types/face'
 
 interface EmployeeListProps {
@@ -8,7 +10,7 @@ interface EmployeeListProps {
 
 function formatArrival(value: string | null): string {
   if (!value) return '—'
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat('vi-VN', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -17,33 +19,45 @@ function formatArrival(value: string | null): string {
 }
 
 export function EmployeeList({ employees, loading, error }: EmployeeListProps) {
+  const [query, setQuery] = useState('')
+  const search = query.trim().toLocaleLowerCase('vi-VN')
+  const filteredEmployees = employees.filter((employee) =>
+    `${employee.name} ${employee.employee_id}`.toLocaleLowerCase('vi-VN').includes(search),
+  )
   const arrivedCount = employees.filter((employee) => employee.is_arrive).length
 
   return (
     <aside className="employee-card" aria-labelledby="employees-heading">
       <div className="employee-card-header">
         <div>
-          <h3 id="employees-heading">Today’s employees</h3>
-          <p>{arrivedCount} arrived today</p>
+          <h3 id="employees-heading">Nhân viên hôm nay</h3>
+          <p>{loading ? 'Đang tải dữ liệu' : error ? 'Dữ liệu chưa được cập nhật' : `${arrivedCount} đã vào ca / ${employees.length} nhân viên`}</p>
         </div>
-        <span className="count-badge" aria-label={`${employees.length} employees`}>
+        <span className="count-badge" aria-label={`${employees.length} nhân viên`}>
           {employees.length}
         </span>
       </div>
 
       {loading && employees.length === 0 ? (
-        <div className="empty-list">Loading employees…</div>
+        <div className="empty-list">Đang tải nhân viên…</div>
       ) : null}
-      {error ? <div className="list-error">{error}</div> : null}
+      {error ? <InlineNotification kind="error" role="alert" title="Chưa tải được danh sách" subtitle={error} hideCloseButton lowContrast /> : null}
       {!loading && !error && employees.length === 0 ? (
         <div className="empty-list">
-          No employees enrolled yet. Use the enrollment tab to add someone.
+          Chưa có nhân viên. Chọn Đăng ký nhân viên để thêm hồ sơ.
         </div>
       ) : null}
 
       {employees.length > 0 ? (
+        <>
+        <div className="employee-search">
+          <TextInput id="employee-search" type="search" labelText="Tìm nhân viên"
+            placeholder="Nhập tên hoặc mã nhân viên" value={query}
+            onChange={(event) => setQuery(event.target.value)} />
+        </div>
+        {filteredEmployees.length === 0 ? <p className="empty-list" role="status">Không tìm thấy nhân viên phù hợp.</p> : null}
         <ul className="employee-list">
-          {employees.map((employee) => (
+          {filteredEmployees.map((employee) => (
             <li className="employee-row" key={employee.employee_id}>
               <span className={`arrival-check${employee.is_arrive ? ' arrived' : ''}`}>
                 {employee.is_arrive ? (
@@ -57,12 +71,13 @@ export function EmployeeList({ employees, loading, error }: EmployeeListProps) {
                 <span className="employee-id">{employee.employee_id}</span>
               </span>
               <span className={`arrival-time${employee.is_arrive ? ' arrived' : ''}`}>
-                <span>Vào: {formatArrival(employee.arrived_at)}</span><br />
-                <span>Ra: {formatArrival(employee.departed_at)}</span>
+                <span><small>Vào ca</small><time dateTime={employee.arrived_at ?? undefined}>{formatArrival(employee.arrived_at)}</time></span>
+                <span><small>Ra ca</small><time dateTime={employee.departed_at ?? undefined}>{formatArrival(employee.departed_at)}</time></span>
               </span>
             </li>
           ))}
         </ul>
+        </>
       ) : null}
     </aside>
   )

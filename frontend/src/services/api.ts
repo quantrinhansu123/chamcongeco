@@ -25,13 +25,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     response = await fetch(`${API_URL}${path}`, options)
   } catch {
     throw new ApiError(
-      'Cannot reach the attendance server. Make sure the backend is running.',
+      'Không kết nối được máy chủ chấm công. Kiểm tra kết nối hoặc liên hệ quản trị viên.',
       0,
     )
   }
 
   if (!response.ok) {
-    let message = `Request failed with status ${response.status}.`
+    let message = `Yêu cầu thất bại (mã ${response.status}).`
     try {
       const body = (await response.json()) as { detail?: string }
       if (body.detail) message = body.detail

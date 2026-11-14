@@ -27,7 +27,7 @@ export function AttendanceTab() {
       setListError(null)
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
-      setListError(error instanceof Error ? error.message : 'Could not load employees.')
+      setListError(error instanceof Error ? error.message : 'Không thể tải danh sách nhân viên.')
     } finally {
       setLoading(false)
     }
@@ -55,69 +55,85 @@ export function AttendanceTab() {
     if (face.employee_id) recognizedEmployees.set(face.employee_id, face.name)
   }
   const showAttendanceResults =
+    !listError &&
     camera.recognitionState !== 'backend-error' &&
     camera.recognitionState !== 'spoof-detected' &&
     recognizedEmployees.size > 0
+  const matchedEmployees = [...recognizedEmployees.keys()].map((id) =>
+    employees.find((employee) => employee.employee_id === id),
+  )
+  const hasResult = camera.recognitionState === 'recognized' && matchedEmployees.length > 0
+  const hasArrival = hasResult && matchedEmployees.every((employee) => employee?.arrived_at)
+  const isComplete = hasResult && matchedEmployees.every((employee) => employee?.departed_at)
+  const nextAction = hasArrival ? 'out' : action
+  const awaitingConfirmation = hasResult && matchedEmployees.some((employee) =>
+    action === 'out' ? !employee?.departed_at : !employee?.arrived_at,
+  )
+
+  const startAttendance = () => {
+    camera.changeAction(nextAction)
+    setAction(nextAction)
+    void camera.startCamera()
+  }
 
   return (
     <section className="panel" aria-labelledby="attendance-title">
       <div className="panel-header">
         <div>
           <h2 id="attendance-title">Chấm công khuôn mặt</h2>
-          <p>Chọn Vào ca hoặc Ra ca rồi nhìn vào camera. Giờ Việt Nam được ghi từ máy chủ.</p>
+          <p>Chấm công vào khi bắt đầu ca. Sau khi ghi nhận, dùng cùng nút để chấm công ra.</p>
         </div>
-        <span className="status-pill">Live session</span>
+        <span className="step-pill">Giờ Việt Nam · UTC+7</span>
       </div>
 
-      <div className="tabs" role="group" aria-label="Loại chấm công">
-        <button type="button" className={action === 'in' ? 'tab active' : 'tab'} aria-pressed={action === 'in'} onClick={() => { if (action !== 'in') { camera.changeAction('in'); setAction('in') } }}>Vào ca</button>
-        <button type="button" className={action === 'out' ? 'tab active' : 'tab'} aria-pressed={action === 'out'} onClick={() => { if (action !== 'out') { camera.changeAction('out'); setAction('out') } }}>Ra ca</button>
-        <span>Đang chấm {action === 'out' ? 'giờ ra' : 'giờ vào'} — có thể đổi khi camera đang bật.</span>
-      </div>
       <div className="camera-layout">
-        <CameraView
-          videoRef={camera.videoRef}
-          cameraState={camera.cameraState}
-          recognitionState={camera.recognitionState}
-          faces={camera.faces}
-          frameSize={camera.frameSize}
-          error={camera.error}
-          hasEmployees={employees.length > 0}
-          onStart={camera.startCamera}
-          onStop={camera.stopCamera}
-        />
+        <div className="attendance-workspace">
+          <CameraView
+            videoRef={camera.videoRef}
+            cameraState={camera.cameraState}
+            recognitionState={camera.recognitionState}
+            faces={camera.faces}
+            frameSize={camera.frameSize}
+            error={camera.error}
+            hasEmployees={employees.length > 0}
+            actionLabel={isComplete ? 'Đã chấm công hôm nay' : nextAction === 'out' ? 'Chấm công ra' : 'Chấm công vào'}
+            actionDisabled={loading || !!listError || employees.length === 0 || awaitingConfirmation || isComplete}
+            hasResult={hasResult}
+            onStart={startAttendance}
+            onStop={() => { camera.stopCamera(); camera.changeAction('in'); setAction('in') }}
+          />
+          {showAttendanceResults ? (
+            <div className="attendance-confirmations" aria-live="polite">
+              {[...recognizedEmployees].map(([employeeId, name]) => {
+                const employee = employees.find((item) => item.employee_id === employeeId)
+                const arrivedAt = action === 'out' ? employee?.departed_at : employee?.arrived_at
+
+                return (
+                  <div className={`attendance-confirmation${arrivedAt ? '' : ' pending'}`} key={employeeId}>
+                    {arrivedAt ? <span className="attendance-confirmation-check" aria-hidden="true">
+                      <svg viewBox="0 0 24 24">
+                        <path d="m6.5 12.5 3.5 3.5 7.5-8" />
+                      </svg>
+                    </span> : <span className="spinner" aria-hidden="true" />}
+                    <div className="attendance-confirmation-copy">
+                      <strong>{name}</strong>
+                      <span>
+                        {arrivedAt
+                          ? `${action === 'out' ? 'Đã ghi giờ ra' : 'Đã ghi giờ vào'}: ${formatAttendanceTime(arrivedAt)}`
+                          : 'Đang cập nhật giờ chấm công…'}
+                      </span>
+                    </div>
+                    <span className="attendance-confirmation-badge">
+                      {arrivedAt ? 'Đã lưu' : 'Đang lưu'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          ) : null}
+        </div>
         <EmployeeList employees={employees} loading={loading} error={listError} />
       </div>
-
-      {showAttendanceResults ? (
-        <div className="attendance-confirmations" aria-live="polite">
-          {[...recognizedEmployees].map(([employeeId, name]) => {
-            const employee = employees.find((item) => item.employee_id === employeeId)
-            const arrivedAt = action === 'out' ? employee?.departed_at : employee?.arrived_at
-
-            return (
-              <div className="attendance-confirmation" key={employeeId}>
-                <span className="attendance-confirmation-check" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path d="m6.5 12.5 3.5 3.5 7.5-8" />
-                  </svg>
-                </span>
-                <div className="attendance-confirmation-copy">
-                  <strong>{name}</strong>
-                  <span>
-                    {arrivedAt
-                      ? `${action === 'out' ? 'Đã ghi giờ ra' : 'Đã ghi giờ vào'}: ${formatAttendanceTime(arrivedAt)}`
-                      : 'Recording attendance time…'}
-                  </span>
-                </div>
-                <span className="attendance-confirmation-badge">
-                  {arrivedAt ? 'Đã lưu' : 'Đang lưu'}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      ) : null}
     </section>
   )
 }

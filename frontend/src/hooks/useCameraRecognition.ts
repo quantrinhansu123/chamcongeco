@@ -59,7 +59,7 @@ export function useCameraRecognition({
   const startCamera = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraState('unavailable')
-      setError('This browser does not support camera access.')
+      setError('Trình duyệt này không hỗ trợ truy cập camera.')
       return
     }
 
@@ -80,6 +80,7 @@ export function useCameraRecognition({
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         await videoRef.current.play()
+        if (generation !== requestGenerationRef.current) return
         if (videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
           setFrameSize({
             width: videoRef.current.videoWidth,
@@ -89,14 +90,18 @@ export function useCameraRecognition({
       }
       setCameraState('active')
     } catch (cameraError) {
+      if (generation !== requestGenerationRef.current) return
+      streamRef.current?.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+      if (videoRef.current) videoRef.current.srcObject = null
       const denied =
         cameraError instanceof DOMException &&
         ['NotAllowedError', 'SecurityError'].includes(cameraError.name)
       setCameraState(denied ? 'permission-denied' : 'unavailable')
       setError(
         denied
-          ? 'Camera permission was denied. Allow access in your browser settings.'
-          : 'No usable camera was found on this device.',
+          ? 'Quyền camera bị từ chối. Cho phép truy cập trong cài đặt trình duyệt.'
+          : 'Không tìm thấy camera khả dụng trên thiết bị.',
       )
     }
   }, [stopCamera])
@@ -136,13 +141,13 @@ export function useCameraRecognition({
       canvas.width = width
       canvas.height = height
       const context = canvas.getContext('2d')
-      if (!context) throw new Error('The browser could not create a camera canvas.')
+      if (!context) throw new Error('Trình duyệt không thể xử lý ảnh camera.')
 
       context.drawImage(video, 0, 0, width, height)
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob(resolve, 'image/jpeg', 0.82),
       )
-      if (!blob) throw new Error('The browser could not encode the camera frame.')
+      if (!blob) throw new Error('Trình duyệt không thể tạo ảnh từ camera.')
       if (generation !== requestGenerationRef.current) return
 
       const controller = new AbortController()
@@ -162,19 +167,24 @@ export function useCameraRecognition({
       setFaces(result.faces)
       setFrameSize({ width, height })
       if (result.faces.some((face) => face.employee_id !== null)) {
+        // One confirmed recognition per click; checkout requires a new user action.
+        streamRef.current?.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+        if (videoRef.current) videoRef.current.srcObject = null
+        setCameraState('idle')
         setRecognitionState('recognized')
+        onAttendanceUpdated()
       } else if (result.faces.length > 0) {
         setRecognitionState('unknown')
       } else {
         setRecognitionState('no-face')
       }
       setError(null)
-      if (result.attendance_updated.length > 0) onAttendanceUpdated()
     } catch (requestError) {
       if (generation !== requestGenerationRef.current) return
       if (requestError instanceof DOMException && requestError.name === 'AbortError') return
       console.error('[recognition] Camera frame failed', requestError)
-      const message = requestError instanceof Error ? requestError.message : 'Recognition failed.'
+      const message = requestError instanceof Error ? requestError.message : 'Nhận diện không thành công.'
       if (
         requestError instanceof ApiError &&
         requestError.status === 403 &&
@@ -182,7 +192,7 @@ export function useCameraRecognition({
       ) {
         setFaces([])
         setRecognitionState('spoof-detected')
-        setError('Photo or screen detected — use your live face. Attendance was not recorded.')
+        setError('Phát hiện ảnh hoặc màn hình. Hãy dùng khuôn mặt thật; chưa ghi nhận chấm công.')
       } else {
         setRecognitionState('backend-error')
         setError(message)

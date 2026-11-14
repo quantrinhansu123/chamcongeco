@@ -1,3 +1,4 @@
+import { Button } from '@carbon/react'
 import type { RefObject } from 'react'
 import type {
   CameraState,
@@ -13,16 +14,19 @@ interface CameraViewProps {
   frameSize: { width: number; height: number }
   error: string | null
   hasEmployees: boolean
+  actionLabel: string
+  actionDisabled: boolean
+  hasResult: boolean
   onStart: () => void
   onStop: () => void
 }
 
 const cameraLabels: Record<CameraState, { title: string; detail: string }> = {
-  idle: { title: 'Camera paused', detail: 'Start when you are ready' },
-  requesting: { title: 'Requesting camera', detail: 'Waiting for browser permission' },
-  active: { title: 'Camera active', detail: 'Scanning every second' },
+  idle: { title: 'Camera đang tắt', detail: 'Chỉ mở khi bạn bấm nút chấm công' },
+  requesting: { title: 'Đang mở camera', detail: 'Chờ bạn cấp quyền trong trình duyệt' },
+  active: { title: 'Camera đang bật', detail: 'Giữ khuôn mặt rõ trong khung hình' },
   'permission-denied': { title: 'Chưa có quyền camera', detail: 'Chọn Luôn cho phép camera trong cài đặt trang web' },
-  unavailable: { title: 'Camera unavailable', detail: 'Check your camera connection' },
+  unavailable: { title: 'Không thể mở camera', detail: 'Kiểm tra kết nối camera' },
 }
 
 function recognitionMessage(
@@ -31,19 +35,19 @@ function recognitionMessage(
   hasEmployees: boolean,
   error: string | null,
 ) {
-  if (!hasEmployees) return 'Enroll an employee before starting recognition.'
-  if (state === 'recognizing') return 'Checking the current frame…'
+  if (!hasEmployees) return 'Đăng ký nhân viên trước khi chấm công.'
+  if (state === 'recognizing') return 'Đang nhận diện khuôn mặt…'
   if (state === 'recognized') {
     const names = [...new Set(faces.filter((face) => face.employee_id).map((face) => face.name))]
-    return `Recognized: ${names.join(', ')}`
+    return `Đã nhận diện: ${names.join(', ')}`
   }
-  if (state === 'unknown') return 'A face was found, but it did not match an employee.'
-  if (state === 'no-face') return 'Camera is ready. Move a face into the frame.'
+  if (state === 'unknown') return 'Chưa nhận ra nhân viên. Nhìn thẳng vào camera hoặc đăng ký khuôn mặt.'
+  if (state === 'no-face') return 'Đưa khuôn mặt vào khung hình để chấm công.'
   if (state === 'spoof-detected') {
-    return error ?? 'Photo or screen detected — use your live face. Attendance was not recorded.'
+    return error ?? 'Phát hiện ảnh hoặc màn hình. Hãy dùng khuôn mặt thật; chưa ghi nhận chấm công.'
   }
-  if (state === 'backend-error') return error ?? 'The recognition server is unavailable.'
-  return 'Recognition will start automatically when the camera is active.'
+  if (state === 'backend-error') return error ?? 'Không thể kết nối máy chủ nhận diện.'
+  return 'Nhận diện tự động sau khi bạn bật camera.'
 }
 
 export function CameraView({
@@ -54,6 +58,9 @@ export function CameraView({
   frameSize,
   error,
   hasEmployees,
+  actionLabel,
+  actionDisabled,
+  hasResult,
   onStart,
   onStop,
 }: CameraViewProps) {
@@ -73,26 +80,27 @@ export function CameraView({
           </span>
         </div>
         {cameraState === 'active' ? (
-          <button className="secondary-button" type="button" onClick={onStop}>
-            Pause camera
-          </button>
+          <Button kind="tertiary" type="button" onClick={onStop}>
+            Dừng chấm công
+          </Button>
         ) : (
-          <button
-            className="secondary-button"
+          <Button
+            className="attendance-button"
             type="button"
-            disabled={cameraState === 'requesting'}
+            disabled={cameraState === 'requesting' || actionDisabled}
             onClick={() => void onStart()}
           >
-            {cameraState === 'requesting' ? 'Starting…' : 'Start camera'}
-          </button>
+            {cameraState === 'requesting' ? 'Đang mở camera…' : actionLabel}
+          </Button>
         )}
+        {hasResult ? <Button kind="ghost" type="button" onClick={onStop}>Chấm công người khác</Button> : null}
       </div>
 
       <div
         className={`camera-frame${recognitionState === 'spoof-detected' ? ' spoof-detected' : ''}`}
         style={{ aspectRatio: `${frameSize.width} / ${frameSize.height}` }}
       >
-        <video ref={videoRef} muted playsInline aria-label="Live attendance camera" />
+        <video ref={videoRef} muted playsInline aria-label="Camera chấm công trực tiếp" />
         {cameraState !== 'active' ? (
           <div className="camera-placeholder">
             <div>
@@ -101,8 +109,8 @@ export function CameraView({
                   <path d="M4 7.5h11.5v9H4zM15.5 10l4.5-2.5v9L15.5 14" />
                 </svg>
               </span>
-              <strong>{cameraLabel.title}</strong>
-              <p>{error ?? 'Your live camera preview will appear here.'}</p>
+              <strong>{hasResult ? 'Đã nhận diện khuôn mặt' : cameraLabel.title}</strong>
+              <p>{error ?? (hasResult ? 'Camera đã dừng. Kiểm tra kết quả chấm công bên dưới.' : 'Bấm nút chấm công, cho phép camera và nhìn thẳng vào ống kính.')}</p>
             </div>
           </div>
         ) : null}
@@ -123,8 +131,7 @@ export function CameraView({
                   style={{ top: `${top}%`, left: `${left}%`, width: `${width}%`, height: `${height}%` }}
                 >
                   <span className="face-label">
-                    {face.name}
-                    {face.distance === null ? '' : ` · ${face.distance.toFixed(2)}`}
+                    {face.employee_id ? face.name : 'Chưa nhận diện'}
                   </span>
                 </div>
               )
@@ -133,15 +140,15 @@ export function CameraView({
         ) : null}
         {cameraState === 'active' && recognitionState === 'spoof-detected' ? (
           <div className="spoof-warning" role="alert">
-            <strong>Photo or phone screen detected</strong>
-            <span>Use your live face. Attendance was not recorded.</span>
+            <strong>Phát hiện ảnh hoặc màn hình</strong>
+            <span>Hãy dùng khuôn mặt thật. Chưa ghi nhận chấm công.</span>
           </div>
         ) : null}
       </div>
 
       <div className="recognition-strip" role="status">
         {recognitionState === 'recognizing' ? <span className="spinner" /> : null}
-        <strong>Recognition</strong>
+        <strong>Nhận diện</strong>
         <span>{recognitionMessage(recognitionState, faces, hasEmployees, error)}</span>
       </div>
       <p>Để trình duyệt nhớ quyền camera, chọn “Luôn cho phép” cho địa chỉ web này.
